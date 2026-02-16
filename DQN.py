@@ -5,6 +5,7 @@ from typing import List, Tuple, Dict
 from torch.optim import Optimizer, Adam
 import numpy as np
 from rl_model import RLModel
+import copy
 
 class ExperienceManager:
     def __init__(self, max_size: int, batch_size: int, state_size: int):
@@ -60,25 +61,29 @@ class ExperienceManager:
     
 # TODO: implement n-step return
 # TODO: implement target network
-# TODO: implement replay memory
 class ValueModelManager:
-    def __init__(self, state_size: int, actions_amount: int, gamma: float, batch_size: int, learning_rate: float):
+    def __init__(self, state_size: int, actions_amount: int, gamma: float, batch_size: int, learning_rate: float, 
+                 experience_replay_max_size: int, updates_to_renew_target_network: int):
         self.gamma: float = gamma
 
-        self.model: ValueModel = ValueModel(state_size, actions_amount)
-        self.optimizer: Optimizer = Adam(self.model.parameters(), lr=learning_rate)
+        self.policy_network: ValueModel = ValueModel(state_size, actions_amount)
+        self.target_network: ValueModel = copy.deepcopy(self.policy_network)
+
+        self.optimizer: Optimizer = Adam(self.policy_network.parameters(), lr=learning_rate)
         self.loss_function: torch.nn.MSELoss = torch.nn.MSELoss()
 
-        self.experience_manager: ExperienceManager = ExperienceManager(128, batch_size, state_size)
+        self.experience_manager: ExperienceManager = ExperienceManager(experience_replay_max_size, batch_size, state_size)
+        self.updates_to_renew_target_network: int = updates_to_renew_target_network
+        self.update_count: int = 0
 
     def get_state_q_values(self, state: List[float]) -> Tensor:
         state_tensor: Tensor = torch.tensor(state, dtype=torch.float32)
-        return self.model(state_tensor)
+        return self.policy_network(state_tensor)
     
     def inference_get_state_q_values(self, state: List[float]) -> Tensor:
         with torch.no_grad():
             state_tensor: Tensor = torch.tensor(state, dtype=torch.float32)
-            return self.model(state_tensor)
+            return self.policy_network(state_tensor)
 
     def improve(self, state: List[float], action: int, reward: float, next_state: List[float], episode_terminated: bool) -> None:
         self.experience_manager.add_experience(state, action, reward, next_state, episode_terminated)
@@ -95,26 +100,32 @@ class ValueModelManager:
         next_state_tensor: Tensor = experience_tensors[3]
         episode_terminated_tensor: Tensor = experience_tensors[4]
 
-        predicted_rewards: Tensor = self.model(state_tensor)
+        predicted_rewards: Tensor = self.policy_network(state_tensor)
         predicted_action_rewards: Tensor = predicted_rewards.gather(dim=-1, index=action_tensor)
 
-        predicted_next_rewards: Tensor = self.model(next_state_tensor)
-        predicted_next_max_reward: Tensor = predicted_next_rewards.max(dim=-1, keepdim=True)[0]
+        predicted_next_rewards: Tensor = self.target_network(next_state_tensor)
+        predicted_next_max_reward: Tensor = predicted_next_rewards.max(dim=-1, keepdim=True)[0].detach()
 
         expected_action_rewards: Tensor = reward_tensor + self.gamma * predicted_next_max_reward * (1 - episode_terminated_tensor)
         loss: Tensor = self.loss_function(predicted_action_rewards, expected_action_rewards)
 
-
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
-        
+
+        self.update_count += 1
+        if self.update_count >= self.updates_to_renew_target_network:
+            self.target_network = copy.deepcopy(self.policy_network)
+            self.update_count = 0
+
 
 # TODO: make eps variable with respect to time step
 class DQN(RLModel):
-    def __init__(self, state_size: int, actions_amount: int, gamma: float = 0.99, value_lr: float = 1e-3, value_batch_size: int = 32):
+    def __init__(self, state_size: int, actions_amount: int, gamma: float = 0.99, value_lr: float = 1e-3, value_batch_size: int = 32,
+                 experience_replay_max_size: int = 1024, updates_to_renew_target_network: int = 128):
         super().__init__(state_size, actions_amount, gamma)
-        self.value_model_manager: ValueModelManager = ValueModelManager(state_size, actions_amount, gamma, value_batch_size, value_lr)
+        self.value_model_manager: ValueModelManager = ValueModelManager(state_size, actions_amount, gamma, value_batch_size, value_lr,
+                                                                        experience_replay_max_size, updates_to_renew_target_network)
 
     
     def get_next_action(self, state: List[float]) -> int:

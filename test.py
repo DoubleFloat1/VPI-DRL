@@ -121,15 +121,15 @@ class ResultWriter:
 
 
 
-normal_training_epochs: int = 0
-vpi_training_epochs: int = 20
+normal_training_epochs: int = 20
+vpi_training_epochs: int = 0
 
 writer = ResultWriter()
 
 for t in range(1):
     print(f"trial {t}")
 
-    model = VPIDQN(8, 4)
+    model = DQN(8, 4)
     train_manager: TrainManager = TrainManager(4)
     test_manager: TestManager = TestManager()
 

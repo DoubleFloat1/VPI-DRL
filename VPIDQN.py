@@ -65,29 +65,34 @@ class ExperienceManager:
 # TODO: implement replay memory
 # TODO: make pass_posterior_to_prior more modular (some constants should be parameters)
 class ValueModelManager:
-    def __init__(self, state_size: int, actions_amount: int, gamma: float, batch_size: int, learning_rate: float, kl_weight: float, device: torch.device):
+    def __init__(self, state_size: int, actions_amount: int, gamma: float, batch_size: int, learning_rate: float, kl_weight: float,
+                 updates_to_pass_posterior: int, experience_replay_max_size: int, updates_to_renew_target_network: int, device: torch.device):
         self.device: torch.device = device
         self.gamma: float = gamma
 
-        self.model: BayesValueModelUniform = BayesValueModelUniform(state_size, actions_amount).to(device)
-        self.model.prior_to_device(device)
-        self.optimizer: Optimizer = Adam(self.model.parameters(), lr=learning_rate)
+        self.policy_network: BayesValueModelUniform = BayesValueModelUniform(state_size, actions_amount).to(device)
+        self.policy_network.prior_to_device(device)
+        self.target_network: BayesValueModelUniform = copy.deepcopy(self.policy_network)
+
+        self.optimizer: Optimizer = Adam(self.policy_network.parameters(), lr=learning_rate)
         self.loss_function: torch.nn.MSELoss = torch.nn.MSELoss()
         self.kl_weight: float = kl_weight
 
-        self.experience_manager: ExperienceManager = ExperienceManager(128, batch_size, state_size)
+        self.experience_manager: ExperienceManager = ExperienceManager(experience_replay_max_size, batch_size, state_size)
+        self.updates_to_renew_target_network: int = updates_to_renew_target_network
 
+        self.updates_to_pass_posterior: int = updates_to_pass_posterior
         self.updates_count: int = 0
 
     def sample_state_q_values(self, state: List[float]) -> Tensor:
         state_tensor: Tensor = torch.tensor(state, dtype=torch.float32).to(self.device)
         q_values: Tensor
-        q_values, _, _ = self.model(state_tensor)
+        q_values, _, _ = self.policy_network(state_tensor)
         return q_values
     
     def detailed_sample_state_q_values(self, state: List[float]) -> Tensor:
         state_tensor: Tensor = torch.tensor(state, dtype=torch.float32).to(self.device)
-        return self.model(state_tensor)
+        return self.policy_network(state_tensor)
     
     def multisample_state_q_values(self, state: List[float], sample_size: int) -> Tensor:
         samples: List[Tensor] = [self.sample_state_q_values(state) for _ in range(sample_size)]
@@ -97,7 +102,7 @@ class ValueModelManager:
         with torch.no_grad():
             state_tensor: Tensor = torch.tensor(state, dtype=torch.float32).to(self.device)
             q_values: Tensor
-            q_values, _, _ = self.model(state_tensor)
+            q_values, _, _ = self.policy_network(state_tensor)
             return q_values
 
     def improve(self, state: List[float], action: int, reward: float, next_state: List[float], episode_terminated: bool) -> None:
@@ -116,32 +121,36 @@ class ValueModelManager:
         episode_terminated_tensor: Tensor = experience_tensors[4]
 
         predicted_rewards: Tensor 
-        predicted_rewards, _, _ = self.model(state_tensor)
+        predicted_rewards, _, _ = self.policy_network(state_tensor)
         predicted_action_rewards: Tensor = predicted_rewards.gather(dim=-1, index=action_tensor)
 
         predicted_next_rewards: Tensor 
-        predicted_next_rewards, _, _ = self.model(next_state_tensor)
-        predicted_next_max_reward: Tensor = predicted_next_rewards.max(dim=-1, keepdim=True)[0]
+        predicted_next_rewards, _, _ = self.target_network(next_state_tensor)
+        predicted_next_max_reward: Tensor = predicted_next_rewards.max(dim=-1, keepdim=True)[0].detach()
 
         expected_action_rewards: Tensor = reward_tensor + self.gamma * predicted_next_max_reward * (1 - episode_terminated_tensor)
         loss: Tensor = self.loss_function(predicted_action_rewards, expected_action_rewards)
-        loss += self.model.kl_loss() * self.kl_weight
+        loss += self.policy_network.kl_loss() * self.kl_weight
 
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 
         self.updates_count += 1
-        if self.updates_count % 1000 == 0:
-            self.model.pass_posterior_to_prior()
+        if self.updates_count % self.updates_to_pass_posterior == 0:
+            self.policy_network.pass_posterior_to_prior()
+        if self.updates_count % self.updates_to_renew_target_network == 0:
+            self.target_network = copy.deepcopy(self.policy_network)
 
 
 
 class VPIDQN(RLModel):
-    def __init__(self, state_size: int, actions_amount: int, gamma: float = 0.99, value_lr: float = 1e-3, value_kl_weight: float = 0.1, value_batch_size: int = 32):
+    def __init__(self, state_size: int, actions_amount: int, gamma: float = 0.99, value_lr: float = 1e-3, value_kl_weight: float = 0.1, value_batch_size: int = 32,
+                 updates_to_pass_posterior: int = 512, experience_replay_max_size: int = 1024, updates_to_renew_target_network: int = 128):
         super().__init__(state_size, actions_amount, gamma)
-        self.value_model_manager: ValueModelManager = ValueModelManager(state_size, actions_amount, gamma, value_batch_size, 
-                                                                        value_lr, value_kl_weight, self.device)
+        self.value_model_manager: ValueModelManager = ValueModelManager(state_size, actions_amount, gamma, value_batch_size, value_lr, value_kl_weight, 
+                                                                        updates_to_pass_posterior, experience_replay_max_size, updates_to_renew_target_network,
+                                                                        self.device)
     
     def get_next_action(self, state: List[float]) -> int:
         eps: float = 0.1
