@@ -1,5 +1,4 @@
-from VPIDQN import VPIDQN, TestVPIDQN
-from VPIDQN2 import VPIDQN2, TestVPIDQN2
+from VPIDQN import VPIDQN
 from DQN import DQN
 from rl_model import RLModel
 import gymnasium as gym
@@ -8,7 +7,7 @@ from typing import List
 from numpy import ndarray
 import time
 
-ENV_NAME: str = "CartPole-v1"
+ENV_NAME: str = "LunarLander-v3"
 
 class EnvironmentWrapper:
     def __init__(self, env: Env):
@@ -37,11 +36,9 @@ class TrainManager:
     def __init__(self, envs_amount: int):
         self.envs: List[EnvironmentWrapper] = [EnvironmentWrapper(gym.make(ENV_NAME, render_mode=None)) for _ in range(envs_amount)]
     
-    def train_model(self, model: RLModel, steps_amount: int) -> None:
+    def train_model(self, model: VPIDQN, steps_amount: int) -> None:
         for t in range(steps_amount):
-            if t % 1000 == 0:
-                pass
-                print(t)
+            print(f"{100 * t / (steps_amount - 1):.2f}%", end="\r")
 
             for env in self.envs:
                 state = env.get_current_state()
@@ -52,6 +49,22 @@ class TrainManager:
 
                 if terminated or truncated:
                     env.reset()
+        print()
+    
+    def vpi_train_model(self, model: VPIDQN, steps_amount: int) -> None:
+        for t in range(steps_amount):
+            print(f"{100 * t / (steps_amount - 1):.2f}%", end="\r")
+
+            for env in self.envs:
+                state = env.get_current_state()
+                action = model.vpi_get_next_action(state)
+
+                next_state, reward, terminated, truncated = env.step(action)
+                model.improve(state, action, reward, next_state, terminated)
+
+                if terminated or truncated:
+                    env.reset()
+        print()
 
 class TestManager:
     def __init__(self):
@@ -77,23 +90,80 @@ class TestManager:
         return episode_total_reward_list
 
 
-        
+class ResultWriter:
+    def __init__(self):
+        self.trials_rewards = []
+        self.file_name = "dqn.txt"
+        open(self.file_name, 'w').close()
+    
+    def add_trial_rewards(self, rewards):
+        self.trials_rewards.append(rewards)
+    
+    def write(self):
+        with open(self.file_name, 'w') as file:
+            for rewards in self.trials_rewards:
+                string = self.list_to_str(rewards)
+                file.write(string + "\n")
+    
+    def write_line(self, rewards):
+        with open(self.file_name, 'a') as file:
+            string = self.list_to_str(rewards)
+            file.write(string + "\n")
+    
+    def list_to_str(self, array):
+        n = len(array)
+        string = ""
+        for i in range(n):
+            string += str(array[i])
+            if i < n-1:
+                string += " "
+        return string
 
-model = VPIDQN2(4, 2)
-train_manager: TrainManager = TrainManager(4)
-test_manager: TestManager = TestManager()
 
-rewards = test_manager.test_model(model, 100)
-print(sum(rewards) / len(rewards))
 
-for i in range(10):
-    print(f"Epoch {i}")
+normal_training_epochs: int = 0
+vpi_training_epochs: int = 20
 
-    start = time.perf_counter()
-    train_manager.train_model(model, 10000)
-    end = time.perf_counter()
-    print(f"{end - start:.3f}s")
+writer = ResultWriter()
+
+for t in range(1):
+    print(f"trial {t}")
+
+    model = VPIDQN(8, 4)
+    train_manager: TrainManager = TrainManager(4)
+    test_manager: TestManager = TestManager()
 
     rewards = test_manager.test_model(model, 100)
     print(sum(rewards) / len(rewards))
 
+    mean_reward_history = []
+    for i in range(normal_training_epochs):
+        print(f"Epoch {i}")
+
+        start = time.perf_counter()
+        train_manager.train_model(model, 2000)
+        end = time.perf_counter()
+        print(f"{end - start:.3f}s")
+
+        rewards = test_manager.test_model(model, 100)
+        print(sum(rewards) / len(rewards))
+        mean_reward_history.append(sum(rewards) / len(rewards))
+
+    print("Now with VPI")
+
+    for i in range(normal_training_epochs, normal_training_epochs + vpi_training_epochs):
+        print(f"Epoch {i}")
+
+        start = time.perf_counter()
+        train_manager.vpi_train_model(model, 2000)
+        end = time.perf_counter()
+        print(f"{end - start:.3f}s")
+
+        rewards = test_manager.test_model(model, 100)
+        print(sum(rewards) / len(rewards))
+        mean_reward_history.append(sum(rewards) / len(rewards))
+
+    writer.add_trial_rewards(mean_reward_history)
+    writer.write_line(mean_reward_history)
+
+writer.write()
