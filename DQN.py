@@ -8,15 +8,17 @@ from rl_model import RLModel
 import copy
 
 class ExperienceManager:
-    def __init__(self, max_size: int, batch_size: int, state_size: int):
-        self.state_size: int = state_size
+    def __init__(self, max_size: int, batch_size: int, state_size: List[int]):
+        self.state_size: List[int] = state_size
         self.max_size: int = max_size
         self.batch_size: int = batch_size
 
-        self.state_batch: Tensor = torch.zeros(max_size, state_size, dtype=torch.float32)
+        self.state_batch_dimensions: List[int] = [max_size] + state_size
+
+        self.state_batch: Tensor = torch.zeros(self.state_batch_dimensions, dtype=torch.float32)
         self.action_batch: Tensor = torch.zeros(max_size, 1, dtype=torch.long)
         self.reward_batch: Tensor = torch.zeros(max_size, 1, dtype=torch.float32)
-        self.next_state_batch: Tensor = torch.zeros(max_size, state_size, dtype=torch.float32)
+        self.next_state_batch: Tensor = torch.zeros(self.state_batch_dimensions, dtype=torch.float32)
         self.episode_terminated_batch: Tensor = torch.zeros(max_size, 1, dtype=torch.float32)
         
         self.multinomial_weights: Tensor = torch.zeros(max_size, dtype=torch.float32)
@@ -48,10 +50,10 @@ class ExperienceManager:
         return (s, a, r, ns, et)
 
     def empty_experience(self) -> None:
-        self.state_batch = torch.zeros(self.max_size, self.state_size, dtype=torch.float32)
+        self.state_batch = torch.zeros(self.state_batch_dimensions, dtype=torch.float32)
         self.action_batch = torch.zeros(self.max_size, 1, dtype=torch.long)
         self.reward_batch = torch.zeros(self.max_size, 1, dtype=torch.float32)
-        self.next_state_batch = torch.zeros(self.max_size, self.state_size, dtype=torch.float32)
+        self.next_state_batch = torch.zeros(self.state_batch_dimensions, dtype=torch.float32)
         self.episode_terminated_batch = torch.zeros(self.max_size, 1, dtype=torch.float32)
         
         self.multinomial_weights = torch.zeros(self.max_size, dtype=torch.float32)
@@ -62,7 +64,7 @@ class ExperienceManager:
 # TODO: implement n-step return
 # TODO: implement target network
 class ValueModelManager:
-    def __init__(self, state_size: int, actions_amount: int, gamma: float, batch_size: int, learning_rate: float, 
+    def __init__(self, state_size: List[int], actions_amount: int, gamma: float, batch_size: int, learning_rate: float, 
                  experience_replay_max_size: int, updates_to_renew_target_network: int):
         self.gamma: float = gamma
 
@@ -121,7 +123,7 @@ class ValueModelManager:
 
 # TODO: make eps variable with respect to time step
 class DQN(RLModel):
-    def __init__(self, state_size: int, actions_amount: int, gamma: float = 0.99, value_lr: float = 1e-3, value_batch_size: int = 32,
+    def __init__(self, state_size: List[int], actions_amount: int, gamma: float = 0.99, value_lr: float = 1e-3, value_batch_size: int = 32,
                  experience_replay_max_size: int = 1024, updates_to_renew_target_network: int = 128):
         super().__init__(state_size, actions_amount, gamma)
         self.value_model_manager: ValueModelManager = ValueModelManager(state_size, actions_amount, gamma, value_batch_size, value_lr,

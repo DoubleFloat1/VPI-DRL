@@ -2,8 +2,8 @@ from typing import List
 import torch
 
 class RLModel:
-    def __init__(self, state_size: int, actions_amount: int, gamma: float = 0.99):
-        self.state_size: int = state_size
+    def __init__(self, state_size: List[int], actions_amount: int, gamma: float = 0.99):
+        self.state_size: List[int] = state_size
         self.actions_amount: int = actions_amount
         self.gamma: float = gamma
         self.device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

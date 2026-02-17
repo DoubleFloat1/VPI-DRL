@@ -10,15 +10,17 @@ from numpy import ndarray
 import copy
 
 class ExperienceManager:
-    def __init__(self, max_size: int, batch_size: int, state_size: int):
-        self.state_size: int = state_size
+    def __init__(self, max_size: int, batch_size: int, state_size: List[int]):
+        self.state_size: List[int] = state_size
         self.max_size: int = max_size
         self.batch_size: int = batch_size
 
-        self.state_batch: Tensor = torch.zeros(max_size, state_size, dtype=torch.float32)
+        self.state_batch_dimensions: List[int] = [max_size] + state_size
+
+        self.state_batch: Tensor = torch.zeros(self.state_batch_dimensions, dtype=torch.float32)
         self.action_batch: Tensor = torch.zeros(max_size, 1, dtype=torch.long)
         self.reward_batch: Tensor = torch.zeros(max_size, 1, dtype=torch.float32)
-        self.next_state_batch: Tensor = torch.zeros(max_size, state_size, dtype=torch.float32)
+        self.next_state_batch: Tensor = torch.zeros(self.state_batch_dimensions, dtype=torch.float32)
         self.episode_terminated_batch: Tensor = torch.zeros(max_size, 1, dtype=torch.float32)
         
         self.multinomial_weights: Tensor = torch.zeros(max_size, dtype=torch.float32)
@@ -50,10 +52,10 @@ class ExperienceManager:
         return (s, a, r, ns, et)
 
     def empty_experience(self) -> None:
-        self.state_batch = torch.zeros(self.max_size, self.state_size, dtype=torch.float32)
+        self.state_batch = torch.zeros(self.state_batch_dimensions, dtype=torch.float32)
         self.action_batch = torch.zeros(self.max_size, 1, dtype=torch.long)
         self.reward_batch = torch.zeros(self.max_size, 1, dtype=torch.float32)
-        self.next_state_batch = torch.zeros(self.max_size, self.state_size, dtype=torch.float32)
+        self.next_state_batch = torch.zeros(self.state_batch_dimensions, dtype=torch.float32)
         self.episode_terminated_batch = torch.zeros(self.max_size, 1, dtype=torch.float32)
         
         self.multinomial_weights = torch.zeros(self.max_size, dtype=torch.float32)
@@ -65,7 +67,7 @@ class ExperienceManager:
 # TODO: implement replay memory
 # TODO: make pass_posterior_to_prior more modular (some constants should be parameters)
 class ValueModelManager:
-    def __init__(self, state_size: int, actions_amount: int, gamma: float, batch_size: int, learning_rate: float, kl_weight: float,
+    def __init__(self, state_size: List[int], actions_amount: int, gamma: float, batch_size: int, learning_rate: float, kl_weight: float,
                  updates_to_pass_posterior: int, experience_replay_max_size: int, updates_to_renew_target_network: int, device: torch.device):
         self.device: torch.device = device
         self.gamma: float = gamma
@@ -209,8 +211,8 @@ class VPIDQN(RLModel):
 
     def inference_next_action(self, state: List[float]) -> int:
         with torch.no_grad():
-            q_values, mu, sigma = self.value_model_manager.detailed_sample_state_q_values(state)
-            return mu.argmax(dim=-1).item()
+            sample_q_value, q_value_r1, q_value_r2 = self.value_model_manager.detailed_sample_state_q_values(state)
+            return ((q_value_r1 + q_value_r2) / 2.0).argmax(dim=-1).item()
     
     def improve(self, state: List[float], action: int, reward: float, next_state: List[float], episode_terminated: bool) -> None:
         self.value_model_manager.improve(state, action, reward, next_state, episode_terminated)

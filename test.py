@@ -6,8 +6,11 @@ from gymnasium import Env
 from typing import List
 from numpy import ndarray
 import time
+from gym_envs import *
+import ale_py
 
-ENV_NAME: str = "LunarLander-v3"
+# TODO: add multiple frames per network pass
+gym.register_envs(ale_py)
 
 class EnvironmentWrapper:
     def __init__(self, env: Env):
@@ -33,8 +36,9 @@ class EnvironmentWrapper:
         return self.current_state
 
 class TrainManager:
-    def __init__(self, envs_amount: int):
-        self.envs: List[EnvironmentWrapper] = [EnvironmentWrapper(gym.make(ENV_NAME, render_mode=None)) for _ in range(envs_amount)]
+    def __init__(self, gym_env: GymEnv, envs_amount: int):
+        self.gym_env: GymEnv = gym_env
+        self.envs: List[EnvironmentWrapper] = [EnvironmentWrapper(gym.make(gym_env.gym_name, render_mode=None)) for _ in range(envs_amount)]
     
     def train_model(self, model: VPIDQN, steps_amount: int) -> None:
         for t in range(steps_amount):
@@ -42,9 +46,11 @@ class TrainManager:
 
             for env in self.envs:
                 state = env.get_current_state()
+                state = self.gym_env.preprocess(state)
                 action = model.get_next_action(state)
 
                 next_state, reward, terminated, truncated = env.step(action)
+                next_state = self.gym_env.preprocess(next_state)
                 model.improve(state, action, reward, next_state, terminated)
 
                 if terminated or truncated:
@@ -57,9 +63,11 @@ class TrainManager:
 
             for env in self.envs:
                 state = env.get_current_state()
+                state = self.gym_env.preprocess(state)
                 action = model.vpi_get_next_action(state)
 
                 next_state, reward, terminated, truncated = env.step(action)
+                next_state = self.gym_env.preprocess(next_state)
                 model.improve(state, action, reward, next_state, terminated)
 
                 if terminated or truncated:
@@ -67,8 +75,9 @@ class TrainManager:
         print()
 
 class TestManager:
-    def __init__(self):
-        self.test_env: EnvironmentWrapper = EnvironmentWrapper(gym.make(ENV_NAME, render_mode=None))
+    def __init__(self, gym_env: GymEnv):
+        self.gym_env: GymEnv = gym_env
+        self.test_env: EnvironmentWrapper = EnvironmentWrapper(gym.make(gym_env.gym_name, render_mode=None))
     
     def test_model(self, model: RLModel, episodes_amount: int) -> List[float]:
         episode_count = 0
@@ -76,8 +85,14 @@ class TestManager:
         episode_total_reward_list = []
 
         self.test_env.reset()
+        step_count = 0
         while episode_count < episodes_amount:
+            step_count += 1
+            if step_count % 1000 == 0:
+                pass
+                #print(step_count)
             state = self.test_env.get_current_state()
+            state = self.gym_env.preprocess(state)
             action = model.inference_next_action(state)
             _, reward, terminated, truncated = self.test_env.step(action)
             episode_total_reward += reward
@@ -91,9 +106,9 @@ class TestManager:
 
 
 class ResultWriter:
-    def __init__(self):
+    def __init__(self, file_name: str):
         self.trials_rewards = []
-        self.file_name = "dqn.txt"
+        self.file_name: str = file_name
         open(self.file_name, 'w').close()
     
     def add_trial_rewards(self, rewards):
@@ -120,23 +135,75 @@ class ResultWriter:
         return string
 
 
+gym_env: GymEnv = LunarLander()
+
+normal_training_epochs: int = 0
+vpi_training_epochs: int = 20
+
+writer = ResultWriter("vpidqn2.txt")
+
+for t in range(10):
+    print(f"trial {t}")
+
+    model = VPIDQN(gym_env.state_size, gym_env.actions_amount)
+    train_manager: TrainManager = TrainManager(gym_env, 4)
+    test_manager: TestManager = TestManager(gym_env)
+
+    mean_reward_history = []
+    rewards = test_manager.test_model(model, 100)
+    print(sum(rewards) / len(rewards))
+    mean_reward_history.append(sum(rewards) / len(rewards))
+    for i in range(normal_training_epochs):
+        print(f"Epoch {i}")
+
+        start = time.perf_counter()
+        train_manager.train_model(model, 2000)
+        end = time.perf_counter()
+        print(f"{end - start:.3f}s")
+
+        rewards = test_manager.test_model(model, 100)
+        print(sum(rewards) / len(rewards))
+        mean_reward_history.append(sum(rewards) / len(rewards))
+
+    print("Now with VPI")
+
+    for i in range(normal_training_epochs, normal_training_epochs + vpi_training_epochs):
+        print(f"Epoch {i}")
+
+        start = time.perf_counter()
+        train_manager.vpi_train_model(model, 2000)
+        end = time.perf_counter()
+        print(f"{end - start:.3f}s")
+
+        rewards = test_manager.test_model(model, 100)
+        print(sum(rewards) / len(rewards))
+        mean_reward_history.append(sum(rewards) / len(rewards))
+
+    writer.add_trial_rewards(mean_reward_history)
+    writer.write_line(mean_reward_history)
+
+writer.write()
+
+
+
+gym_env: GymEnv = LunarLander()
 
 normal_training_epochs: int = 20
 vpi_training_epochs: int = 0
 
-writer = ResultWriter()
+writer = ResultWriter("dqn.txt")
 
-for t in range(1):
+for t in range(10):
     print(f"trial {t}")
 
-    model = DQN(8, 4)
-    train_manager: TrainManager = TrainManager(4)
-    test_manager: TestManager = TestManager()
-
-    rewards = test_manager.test_model(model, 100)
-    print(sum(rewards) / len(rewards))
+    model = DQN(gym_env.state_size, gym_env.actions_amount)
+    train_manager: TrainManager = TrainManager(gym_env, 4)
+    test_manager: TestManager = TestManager(gym_env)
 
     mean_reward_history = []
+    rewards = test_manager.test_model(model, 100)
+    print(sum(rewards) / len(rewards))
+    mean_reward_history.append(sum(rewards) / len(rewards))
     for i in range(normal_training_epochs):
         print(f"Epoch {i}")
 

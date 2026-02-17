@@ -13,16 +13,47 @@ import torchbnn as bnn
 from torch import Tensor
 from scipy.stats import norm
 
+from typing import List
+
 class ValueModel(nn.Module):
-	def __init__(self, state_size: int, actions_amount: int):
+	def __init__(self, state_size: List[int], actions_amount: int):
 		super().__init__()
-		self.model = nn.Sequential(
-			nn.Linear(state_size, 64),
-			nn.ReLU(),
-			nn.Linear(64, 64),
-			nn.ReLU(),
-			nn.Linear(64, actions_amount)
-		)
+		if len(state_size) == 1:
+			self.model = nn.Sequential(
+				nn.Linear(state_size[0], 64),
+				nn.ReLU(),
+				nn.Linear(64, 64),
+				nn.ReLU(),
+				nn.Linear(64, actions_amount)
+			)
+		elif len(state_size) == 3:
+			height: int = state_size[1]
+			width: int = state_size[2]
+			for _ in range(4):
+				height = height // 2
+				width = width // 2
+			flatten_size: int = 16 * height * width
+
+			self.model = nn.Sequential(
+				nn.Conv2d(3, 8, 3, padding=1),
+				nn.Conv2d(8, 8, 3, padding=1),
+				nn.MaxPool2d(2, 2),
+				nn.Conv2d(8, 8, 3, padding=1),
+				nn.Conv2d(8, 8, 3, padding=1),
+				nn.MaxPool2d(2, 2),
+				nn.Conv2d(8, 16, 3, padding=1),
+				nn.Conv2d(16, 16, 3, padding=1),
+				nn.MaxPool2d(2, 2),
+				nn.Conv2d(16, 16, 3, padding=1),
+				nn.Conv2d(16, 16, 3, padding=1),
+				nn.MaxPool2d(2, 2),
+				nn.Flatten(start_dim=-3),
+				nn.Linear(flatten_size, 64),
+				nn.ReLU(),
+				nn.Linear(64, 64),
+				nn.ReLU(),
+				nn.Linear(64, actions_amount)
+			)
 	
 	def forward(self, x):
 		return self.model(x)
@@ -289,25 +320,76 @@ class BayesModelUniform(nn.Module):
 
 
 class BayesValueModelUniform(BayesModelUniform):
-	def __init__(self, in_features: int, out_features: int):
+	def __init__(self, state_size: List[int], actions_amount: int):
 		super().__init__()
-		self.range1 = nn.Sequential(
-			nn.Linear(in_features, 64),
-			nn.ReLU(),
-			nn.Linear(64, 64),
-			nn.ReLU(),
-			#nn.Linear(64, out_features)
-			BayesLinear(64, out_features, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
-		)
 
-		self.range2 = nn.Sequential(
-			nn.Linear(in_features, 64),
-			nn.ReLU(),
-			nn.Linear(64, 64),
-			nn.ReLU(),
-			#nn.Linear(64, out_features)
-			BayesLinear(64, out_features, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
-		)
+		if len(state_size) == 1:
+			self.range1 = nn.Sequential(
+				nn.Linear(state_size[0], 64),
+				nn.ReLU(),
+				nn.Linear(64, 64),
+				nn.ReLU(),
+				#nn.Linear(64, out_features)
+				BayesLinear(64, actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
+			)
+
+			self.range2 = nn.Sequential(
+				nn.Linear(state_size[0], 64),
+				nn.ReLU(),
+				nn.Linear(64, 64),
+				nn.ReLU(),
+				#nn.Linear(64, out_features)
+				BayesLinear(64, actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
+			)
+		else:
+			height: int = state_size[1]
+			width: int = state_size[2]
+			for _ in range(4):
+				height = height // 2
+				width = width // 2
+			flatten_size: int = 16 * height * width
+
+			self.range1 = nn.Sequential(
+				nn.Conv2d(3, 8, 3, padding=1),
+				nn.Conv2d(8, 8, 3, padding=1),
+				nn.MaxPool2d(2, 2),
+				nn.Conv2d(8, 8, 3, padding=1),
+				nn.Conv2d(8, 8, 3, padding=1),
+				nn.MaxPool2d(2, 2),
+				nn.Conv2d(8, 16, 3, padding=1),
+				nn.Conv2d(16, 16, 3, padding=1),
+				nn.MaxPool2d(2, 2),
+				nn.Conv2d(16, 16, 3, padding=1),
+				nn.Conv2d(16, 16, 3, padding=1),
+				nn.MaxPool2d(2, 2),
+				nn.Flatten(start_dim=-3),
+				nn.Linear(flatten_size, 64),
+				nn.ReLU(),
+				nn.Linear(64, 64),
+				nn.ReLU(),
+				BayesLinear(64, actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
+			)
+
+			self.range2 = nn.Sequential(
+				nn.Conv2d(3, 8, 3, padding=1),
+				nn.Conv2d(8, 8, 3, padding=1),
+				nn.MaxPool2d(2, 2),
+				nn.Conv2d(8, 8, 3, padding=1),
+				nn.Conv2d(8, 8, 3, padding=1),
+				nn.MaxPool2d(2, 2),
+				nn.Conv2d(8, 16, 3, padding=1),
+				nn.Conv2d(16, 16, 3, padding=1),
+				nn.MaxPool2d(2, 2),
+				nn.Conv2d(16, 16, 3, padding=1),
+				nn.Conv2d(16, 16, 3, padding=1),
+				nn.MaxPool2d(2, 2),
+				nn.Flatten(start_dim=-3),
+				nn.Linear(flatten_size, 64),
+				nn.ReLU(),
+				nn.Linear(64, 64),
+				nn.ReLU(),
+				BayesLinear(64, actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
+			)
 
 		self.range_min: float = 0.0
 		self.range_max: float = 1.0
