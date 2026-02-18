@@ -7,10 +7,15 @@ from typing import List
 from numpy import ndarray
 import time
 from gym_envs import *
+
 import ale_py
+import miniworld
+import highway_env
 
 # TODO: add multiple frames per network pass
 gym.register_envs(ale_py)
+gym.register_envs(miniworld)
+gym.register_envs(highway_env)
 
 class EnvironmentWrapper:
     def __init__(self, env: Env):
@@ -42,7 +47,7 @@ class TrainManager:
     
     def train_model(self, model: VPIDQN, steps_amount: int) -> None:
         for t in range(steps_amount):
-            print(f"{100 * t / (steps_amount - 1):.2f}%", end="\r")
+            print(f"Training: {100 * t / (steps_amount - 1):.2f}%", end="\r")
 
             for env in self.envs:
                 state = env.get_current_state()
@@ -55,11 +60,12 @@ class TrainManager:
 
                 if terminated or truncated:
                     env.reset()
+                    self.gym_env.end_episode()
         print()
     
     def vpi_train_model(self, model: VPIDQN, steps_amount: int) -> None:
         for t in range(steps_amount):
-            print(f"{100 * t / (steps_amount - 1):.2f}%", end="\r")
+            print(f"Training: {100 * t / (steps_amount - 1):.2f}%", end="\r")
 
             for env in self.envs:
                 state = env.get_current_state()
@@ -72,6 +78,7 @@ class TrainManager:
 
                 if terminated or truncated:
                     env.reset()
+                    self.gym_env.end_episode()
         print()
 
 class TestManager:
@@ -86,6 +93,7 @@ class TestManager:
 
         self.test_env.reset()
         step_count = 0
+        print(f"Testing: {episode_count} / {episodes_amount}", end="\r")
         while episode_count < episodes_amount:
             step_count += 1
             if step_count % 1000 == 0:
@@ -100,8 +108,12 @@ class TestManager:
                 episode_total_reward_list.append(episode_total_reward)
                 episode_total_reward = 0.0
                 episode_count += 1
+                print(f"Testing: {episode_count} / {episodes_amount}", end="\r")
                 self.test_env.reset()
+                self.gym_env.end_episode()
         
+        print()
+
         return episode_total_reward_list
 
 
@@ -135,61 +147,13 @@ class ResultWriter:
         return string
 
 
-gym_env: GymEnv = LunarLander()
-
-normal_training_epochs: int = 0
-vpi_training_epochs: int = 20
-
-writer = ResultWriter("vpidqn2.txt")
-
-for t in range(10):
-    print(f"trial {t}")
-
-    model = VPIDQN(gym_env.state_size, gym_env.actions_amount)
-    train_manager: TrainManager = TrainManager(gym_env, 4)
-    test_manager: TestManager = TestManager(gym_env)
-
-    mean_reward_history = []
-    rewards = test_manager.test_model(model, 100)
-    print(sum(rewards) / len(rewards))
-    mean_reward_history.append(sum(rewards) / len(rewards))
-    for i in range(normal_training_epochs):
-        print(f"Epoch {i}")
-
-        start = time.perf_counter()
-        train_manager.train_model(model, 2000)
-        end = time.perf_counter()
-        print(f"{end - start:.3f}s")
-
-        rewards = test_manager.test_model(model, 100)
-        print(sum(rewards) / len(rewards))
-        mean_reward_history.append(sum(rewards) / len(rewards))
-
-    print("Now with VPI")
-
-    for i in range(normal_training_epochs, normal_training_epochs + vpi_training_epochs):
-        print(f"Epoch {i}")
-
-        start = time.perf_counter()
-        train_manager.vpi_train_model(model, 2000)
-        end = time.perf_counter()
-        print(f"{end - start:.3f}s")
-
-        rewards = test_manager.test_model(model, 100)
-        print(sum(rewards) / len(rewards))
-        mean_reward_history.append(sum(rewards) / len(rewards))
-
-    writer.add_trial_rewards(mean_reward_history)
-    writer.write_line(mean_reward_history)
-
-writer.write()
-
-
-
-gym_env: GymEnv = LunarLander()
+gym_env: GymEnv = SpaceInvaders()
 
 normal_training_epochs: int = 20
 vpi_training_epochs: int = 0
+
+test_episode_amount: int = 10
+train_step_amount: int = 2000
 
 writer = ResultWriter("dqn.txt")
 
@@ -201,18 +165,18 @@ for t in range(10):
     test_manager: TestManager = TestManager(gym_env)
 
     mean_reward_history = []
-    rewards = test_manager.test_model(model, 100)
+    rewards = test_manager.test_model(model, test_episode_amount)
     print(sum(rewards) / len(rewards))
     mean_reward_history.append(sum(rewards) / len(rewards))
     for i in range(normal_training_epochs):
         print(f"Epoch {i}")
 
         start = time.perf_counter()
-        train_manager.train_model(model, 2000)
+        train_manager.train_model(model, train_step_amount)
         end = time.perf_counter()
         print(f"{end - start:.3f}s")
 
-        rewards = test_manager.test_model(model, 100)
+        rewards = test_manager.test_model(model, test_episode_amount)
         print(sum(rewards) / len(rewards))
         mean_reward_history.append(sum(rewards) / len(rewards))
 
@@ -222,11 +186,11 @@ for t in range(10):
         print(f"Epoch {i}")
 
         start = time.perf_counter()
-        train_manager.vpi_train_model(model, 2000)
+        train_manager.vpi_train_model(model, train_step_amount)
         end = time.perf_counter()
         print(f"{end - start:.3f}s")
 
-        rewards = test_manager.test_model(model, 100)
+        rewards = test_manager.test_model(model, test_episode_amount)
         print(sum(rewards) / len(rewards))
         mean_reward_history.append(sum(rewards) / len(rewards))
 

@@ -8,29 +8,31 @@ from rl_model import RLModel
 import copy
 
 class ExperienceManager:
-    def __init__(self, max_size: int, batch_size: int, state_size: List[int]):
+    def __init__(self, max_size: int, batch_size: int, state_size: List[int], device: torch.device):
+        self.device: torch.device = device
+
         self.state_size: List[int] = state_size
         self.max_size: int = max_size
         self.batch_size: int = batch_size
 
         self.state_batch_dimensions: List[int] = [max_size] + state_size
 
-        self.state_batch: Tensor = torch.zeros(self.state_batch_dimensions, dtype=torch.float32)
-        self.action_batch: Tensor = torch.zeros(max_size, 1, dtype=torch.long)
-        self.reward_batch: Tensor = torch.zeros(max_size, 1, dtype=torch.float32)
-        self.next_state_batch: Tensor = torch.zeros(self.state_batch_dimensions, dtype=torch.float32)
-        self.episode_terminated_batch: Tensor = torch.zeros(max_size, 1, dtype=torch.float32)
+        self.state_batch: Tensor = torch.zeros(self.state_batch_dimensions, dtype=torch.float32).to(device)
+        self.action_batch: Tensor = torch.zeros(max_size, 1, dtype=torch.long).to(device)
+        self.reward_batch: Tensor = torch.zeros(max_size, 1, dtype=torch.float32).to(device)
+        self.next_state_batch: Tensor = torch.zeros(self.state_batch_dimensions, dtype=torch.float32).to(device)
+        self.episode_terminated_batch: Tensor = torch.zeros(max_size, 1, dtype=torch.float32).to(device)
         
         self.multinomial_weights: Tensor = torch.zeros(max_size, dtype=torch.float32)
         self.current_size: int = 0
         self.next_index: int = 0
 
     def add_experience(self, state: List[float], action: int, reward: float, next_state: List[float], episode_terminated: bool) -> None:
-        self.state_batch[self.next_index] = torch.tensor(state, dtype=torch.float32)
-        self.action_batch[self.next_index] = torch.tensor([action], dtype=torch.long)
-        self.reward_batch[self.next_index] = torch.tensor([reward], dtype=torch.float32)
-        self.next_state_batch[self.next_index] = torch.tensor(next_state, dtype=torch.float32)
-        self.episode_terminated_batch[self.next_index] = torch.tensor([episode_terminated], dtype=torch.float32)
+        self.state_batch[self.next_index] = torch.tensor(state, dtype=torch.float32).to(self.device)
+        self.action_batch[self.next_index] = torch.tensor([action], dtype=torch.long).to(self.device)
+        self.reward_batch[self.next_index] = torch.tensor([reward], dtype=torch.float32).to(self.device)
+        self.next_state_batch[self.next_index] = torch.tensor(next_state, dtype=torch.float32).to(self.device)
+        self.episode_terminated_batch[self.next_index] = torch.tensor([episode_terminated], dtype=torch.float32).to(self.device)
 
         if self.current_size < self.max_size:
             self.multinomial_weights[self.current_size] = 1.0
@@ -50,11 +52,11 @@ class ExperienceManager:
         return (s, a, r, ns, et)
 
     def empty_experience(self) -> None:
-        self.state_batch = torch.zeros(self.state_batch_dimensions, dtype=torch.float32)
-        self.action_batch = torch.zeros(self.max_size, 1, dtype=torch.long)
-        self.reward_batch = torch.zeros(self.max_size, 1, dtype=torch.float32)
-        self.next_state_batch = torch.zeros(self.state_batch_dimensions, dtype=torch.float32)
-        self.episode_terminated_batch = torch.zeros(self.max_size, 1, dtype=torch.float32)
+        self.state_batch = torch.zeros(self.state_batch_dimensions, dtype=torch.float32).to(self.device)
+        self.action_batch = torch.zeros(self.max_size, 1, dtype=torch.long).to(self.device)
+        self.reward_batch = torch.zeros(self.max_size, 1, dtype=torch.float32).to(self.device)
+        self.next_state_batch = torch.zeros(self.state_batch_dimensions, dtype=torch.float32).to(self.device)
+        self.episode_terminated_batch = torch.zeros(self.max_size, 1, dtype=torch.float32).to(self.device)
         
         self.multinomial_weights = torch.zeros(self.max_size, dtype=torch.float32)
         self.current_size = 0
@@ -65,26 +67,27 @@ class ExperienceManager:
 # TODO: implement target network
 class ValueModelManager:
     def __init__(self, state_size: List[int], actions_amount: int, gamma: float, batch_size: int, learning_rate: float, 
-                 experience_replay_max_size: int, updates_to_renew_target_network: int):
+                 experience_replay_max_size: int, updates_to_renew_target_network: int, device: torch.device):
+        self.device: torch.device = device
         self.gamma: float = gamma
 
-        self.policy_network: ValueModel = ValueModel(state_size, actions_amount)
+        self.policy_network: ValueModel = ValueModel(state_size, actions_amount).to(device)
         self.target_network: ValueModel = copy.deepcopy(self.policy_network)
 
         self.optimizer: Optimizer = Adam(self.policy_network.parameters(), lr=learning_rate)
         self.loss_function: torch.nn.MSELoss = torch.nn.MSELoss()
 
-        self.experience_manager: ExperienceManager = ExperienceManager(experience_replay_max_size, batch_size, state_size)
+        self.experience_manager: ExperienceManager = ExperienceManager(experience_replay_max_size, batch_size, state_size, device)
         self.updates_to_renew_target_network: int = updates_to_renew_target_network
         self.update_count: int = 0
 
     def get_state_q_values(self, state: List[float]) -> Tensor:
-        state_tensor: Tensor = torch.tensor(state, dtype=torch.float32)
+        state_tensor: Tensor = torch.tensor(state, dtype=torch.float32).to(self.device)
         return self.policy_network(state_tensor)
     
     def inference_get_state_q_values(self, state: List[float]) -> Tensor:
         with torch.no_grad():
-            state_tensor: Tensor = torch.tensor(state, dtype=torch.float32)
+            state_tensor: Tensor = torch.tensor(state, dtype=torch.float32).to(self.device)
             return self.policy_network(state_tensor)
 
     def improve(self, state: List[float], action: int, reward: float, next_state: List[float], episode_terminated: bool) -> None:
@@ -127,7 +130,7 @@ class DQN(RLModel):
                  experience_replay_max_size: int = 1024, updates_to_renew_target_network: int = 128):
         super().__init__(state_size, actions_amount, gamma)
         self.value_model_manager: ValueModelManager = ValueModelManager(state_size, actions_amount, gamma, value_batch_size, value_lr,
-                                                                        experience_replay_max_size, updates_to_renew_target_network)
+                                                                        experience_replay_max_size, updates_to_renew_target_network, self.device)
 
     
     def get_next_action(self, state: List[float]) -> int:

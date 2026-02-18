@@ -10,29 +10,30 @@ from numpy import ndarray
 import copy
 
 class ExperienceManager:
-    def __init__(self, max_size: int, batch_size: int, state_size: List[int]):
+    def __init__(self, max_size: int, batch_size: int, state_size: List[int], device: torch.device):
+        self.device: torch.device = device
         self.state_size: List[int] = state_size
         self.max_size: int = max_size
         self.batch_size: int = batch_size
 
         self.state_batch_dimensions: List[int] = [max_size] + state_size
 
-        self.state_batch: Tensor = torch.zeros(self.state_batch_dimensions, dtype=torch.float32)
-        self.action_batch: Tensor = torch.zeros(max_size, 1, dtype=torch.long)
-        self.reward_batch: Tensor = torch.zeros(max_size, 1, dtype=torch.float32)
-        self.next_state_batch: Tensor = torch.zeros(self.state_batch_dimensions, dtype=torch.float32)
-        self.episode_terminated_batch: Tensor = torch.zeros(max_size, 1, dtype=torch.float32)
+        self.state_batch: Tensor = torch.zeros(self.state_batch_dimensions, dtype=torch.float32).to(device)
+        self.action_batch: Tensor = torch.zeros(max_size, 1, dtype=torch.long).to(device)
+        self.reward_batch: Tensor = torch.zeros(max_size, 1, dtype=torch.float32).to(device)
+        self.next_state_batch: Tensor = torch.zeros(self.state_batch_dimensions, dtype=torch.float32).to(device)
+        self.episode_terminated_batch: Tensor = torch.zeros(max_size, 1, dtype=torch.float32).to(device)
         
         self.multinomial_weights: Tensor = torch.zeros(max_size, dtype=torch.float32)
         self.current_size: int = 0
         self.next_index: int = 0
 
     def add_experience(self, state: List[float], action: int, reward: float, next_state: List[float], episode_terminated: bool) -> None:
-        self.state_batch[self.next_index] = torch.tensor(state, dtype=torch.float32)
-        self.action_batch[self.next_index] = torch.tensor([action], dtype=torch.long)
-        self.reward_batch[self.next_index] = torch.tensor([reward], dtype=torch.float32)
-        self.next_state_batch[self.next_index] = torch.tensor(next_state, dtype=torch.float32)
-        self.episode_terminated_batch[self.next_index] = torch.tensor([episode_terminated], dtype=torch.float32)
+        self.state_batch[self.next_index] = torch.tensor(state, dtype=torch.float32).to(self.device)
+        self.action_batch[self.next_index] = torch.tensor([action], dtype=torch.long).to(self.device)
+        self.reward_batch[self.next_index] = torch.tensor([reward], dtype=torch.float32).to(self.device)
+        self.next_state_batch[self.next_index] = torch.tensor(next_state, dtype=torch.float32).to(self.device)
+        self.episode_terminated_batch[self.next_index] = torch.tensor([episode_terminated], dtype=torch.float32).to(self.device)
 
         if self.current_size < self.max_size:
             self.multinomial_weights[self.current_size] = 1.0
@@ -43,7 +44,7 @@ class ExperienceManager:
         return self.current_size >= self.batch_size
     
     def get_batch(self) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
-        indexes: Tensor = torch.multinomial(self.multinomial_weights, self.batch_size)
+        indexes: Tensor = torch.multinomial(self.multinomial_weights, self.batch_size).to(self.device)
         s: Tensor = self.state_batch[indexes]
         a: Tensor = self.action_batch[indexes]
         r: Tensor = self.reward_batch[indexes]
@@ -52,11 +53,11 @@ class ExperienceManager:
         return (s, a, r, ns, et)
 
     def empty_experience(self) -> None:
-        self.state_batch = torch.zeros(self.state_batch_dimensions, dtype=torch.float32)
-        self.action_batch = torch.zeros(self.max_size, 1, dtype=torch.long)
-        self.reward_batch = torch.zeros(self.max_size, 1, dtype=torch.float32)
-        self.next_state_batch = torch.zeros(self.state_batch_dimensions, dtype=torch.float32)
-        self.episode_terminated_batch = torch.zeros(self.max_size, 1, dtype=torch.float32)
+        self.state_batch = torch.zeros(self.state_batch_dimensions, dtype=torch.float32).to(self.device)
+        self.action_batch = torch.zeros(self.max_size, 1, dtype=torch.long).to(self.device)
+        self.reward_batch = torch.zeros(self.max_size, 1, dtype=torch.float32).to(self.device)
+        self.next_state_batch = torch.zeros(self.state_batch_dimensions, dtype=torch.float32).to(self.device)
+        self.episode_terminated_batch = torch.zeros(self.max_size, 1, dtype=torch.float32).to(self.device)
         
         self.multinomial_weights = torch.zeros(self.max_size, dtype=torch.float32)
         self.current_size = 0
@@ -80,7 +81,7 @@ class ValueModelManager:
         self.loss_function: torch.nn.MSELoss = torch.nn.MSELoss()
         self.kl_weight: float = kl_weight
 
-        self.experience_manager: ExperienceManager = ExperienceManager(experience_replay_max_size, batch_size, state_size)
+        self.experience_manager: ExperienceManager = ExperienceManager(experience_replay_max_size, batch_size, state_size, device)
         self.updates_to_renew_target_network: int = updates_to_renew_target_network
 
         self.updates_to_pass_posterior: int = updates_to_pass_posterior
@@ -182,7 +183,7 @@ class VPIDQN(RLModel):
         greedy_action = sorted_index_q_value_means[-1]
         second_greedy_action = sorted_index_q_value_means[-2]
 
-        vpis = torch.tensor([1e-5 for _ in range(self.actions_amount)], dtype=torch.float32)
+        vpis = torch.tensor([1e-5 for _ in range(self.actions_amount)], dtype=torch.float32).to(self.device)
         for a in range(self.actions_amount):
             if a != greedy_action:
                 action_range_min = q_value_r1[a]

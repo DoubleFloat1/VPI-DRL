@@ -35,7 +35,7 @@ class ValueModel(nn.Module):
 			flatten_size: int = 16 * height * width
 
 			self.model = nn.Sequential(
-				nn.Conv2d(3, 8, 3, padding=1),
+				nn.Conv2d(state_size[0], 8, 3, padding=1),
 				nn.Conv2d(8, 8, 3, padding=1),
 				nn.MaxPool2d(2, 2),
 				nn.Conv2d(8, 8, 3, padding=1),
@@ -270,6 +270,7 @@ class BayesModelUniform(nn.Module):
 		self.range_min: float = 0.0
 		self.range_max: float = 1.0
 		self.loss: nn.MSELoss = nn.MSELoss()
+		self.device: torch.device = "cpu"
 		# TODO: Is there a way to make a loss function take more into account the variance of the data?
 		# Works well for small variance. It may be best to assume we know a upper and lower bound to normalize the data to [0, 1] range
 		# It seems necessary to use the pass_posterior_to_prior function every once in a while
@@ -297,7 +298,7 @@ class BayesModelUniform(nn.Module):
 
 	
 	def kl_loss(self) -> Tensor:
-		kl_sum: Tensor = torch.tensor([0.0], dtype=torch.float32)
+		kl_sum: Tensor = torch.tensor([0.0], dtype=torch.float32).to(self.device)
 		n: int = 0
 		for m in self.modules():
 			if isinstance(m, BayesLinear):
@@ -308,6 +309,7 @@ class BayesModelUniform(nn.Module):
 		return kl_sum / n
 	
 	def prior_to_device(self, device: torch.device) -> None:
+		self.device = device
 		for m in self.modules():
 			if isinstance(m, BayesLinear):
 				m.prior_to_device(device)
@@ -350,7 +352,7 @@ class BayesValueModelUniform(BayesModelUniform):
 			flatten_size: int = 16 * height * width
 
 			self.range1 = nn.Sequential(
-				nn.Conv2d(3, 8, 3, padding=1),
+				nn.Conv2d(state_size[0], 8, 3, padding=1),
 				nn.Conv2d(8, 8, 3, padding=1),
 				nn.MaxPool2d(2, 2),
 				nn.Conv2d(8, 8, 3, padding=1),
@@ -371,7 +373,7 @@ class BayesValueModelUniform(BayesModelUniform):
 			)
 
 			self.range2 = nn.Sequential(
-				nn.Conv2d(3, 8, 3, padding=1),
+				nn.Conv2d(state_size[0], 8, 3, padding=1),
 				nn.Conv2d(8, 8, 3, padding=1),
 				nn.MaxPool2d(2, 2),
 				nn.Conv2d(8, 8, 3, padding=1),
