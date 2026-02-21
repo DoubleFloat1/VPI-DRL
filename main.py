@@ -10,12 +10,9 @@ from gym_envs import *
 from custom_envs.race_track import RacetrackEnv
 
 import ale_py
-import miniworld
 import highway_env
 
-# TODO: add multiple frames per network pass
 gym.register_envs(ale_py)
-gym.register_envs(miniworld)
 gym.register_envs(highway_env)
 gym.register(id="custom_envs/RaceTrack-v0", entry_point=RacetrackEnv)
 
@@ -42,6 +39,7 @@ class EnvironmentWrapper:
     def get_current_state(self) -> ndarray[float]:
         return self.current_state
 
+# TODO: Frame stacking only works for 1 training environment
 class TrainManager:
     def __init__(self, gym_env: GymEnv, envs_amount: int):
         self.gym_env: GymEnv = gym_env
@@ -166,7 +164,7 @@ def main(gym_env: GymEnv, model_type: RLModel, data_file: str, create_new_data_f
     writer = ResultWriter(data_file, gym_env, model_type, train_step_amount, create_new_data_file)
     for t in range(trials_repeat):
         model: RLModel = model_type.new()
-        train_manager: TrainManager = TrainManager(gym_env, 4)
+        train_manager: TrainManager = TrainManager(gym_env, 1)
         test_manager: TestManager = TestManager(gym_env)
 
         mean_reward_history = []
@@ -191,7 +189,7 @@ def main(gym_env: GymEnv, model_type: RLModel, data_file: str, create_new_data_f
 
 if __name__ == "__main__":
     gym_env = SpaceInvaders()
-    dqn = DQN(gym_env.state_size, gym_env.actions_amount)
-    vpidqn = VPIDQN(gym_env.state_size, gym_env.actions_amount)
-    main(gym_env, dqn, "dqn.txt", test_episode_amount=100, training_epochs=40, train_step_amount=1000)
-    main(gym_env, vpidqn, "vpidqn.txt", test_episode_amount=100, training_epochs=40, train_step_amount=1000)
+    #dqn = DQN(gym_env.state_size, gym_env.actions_amount, experience_replay_max_size=8192)
+    vpidqn = VPIDQN(gym_env.state_size, gym_env.actions_amount, experience_replay_max_size=2048)
+    #main(gym_env, dqn, "dqn.txt", test_episode_amount=10, training_epochs=40, train_step_amount=1000)
+    main(gym_env, vpidqn, "vpidqn.txt", test_episode_amount=10, training_epochs=40, train_step_amount=1000)

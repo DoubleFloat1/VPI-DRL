@@ -61,10 +61,10 @@ def main():
         y_axis_name="Recompensa média"
     )
     
-    plot_file("vpidqn.txt",
+    plot_file("data/space_invader/vpidqn.txt",
               label="VPIDQN",
               color="blue")
-    plot_file("dqn.txt",
+    plot_file("data/space_invader/dqn.txt",
               label="DQN",
               color="red")
     

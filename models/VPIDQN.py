@@ -7,8 +7,6 @@ from typing import List, Tuple, Dict
 from torch.optim import Optimizer, Adam
 import numpy as np
 from models.rl_model import RLModel
-from scipy.stats import norm
-from numpy import ndarray
 import copy
 
 class ExperienceManager:
@@ -30,11 +28,11 @@ class ExperienceManager:
         self.current_size: int = 0
         self.next_index: int = 0
 
-    def add_experience(self, state: List[float], action: int, reward: float, next_state: List[float], episode_terminated: bool) -> None:
-        self.state_batch[self.next_index] = torch.tensor(state, dtype=torch.float32).to(self.device)
+    def add_experience(self, state: Tensor, action: int, reward: float, next_state: Tensor, episode_terminated: bool) -> None:
+        self.state_batch[self.next_index] = state.to(self.device)
         self.action_batch[self.next_index] = torch.tensor([action], dtype=torch.long).to(self.device)
         self.reward_batch[self.next_index] = torch.tensor([reward], dtype=torch.float32).to(self.device)
-        self.next_state_batch[self.next_index] = torch.tensor(next_state, dtype=torch.float32).to(self.device)
+        self.next_state_batch[self.next_index] = next_state.to(self.device)
         self.episode_terminated_batch[self.next_index] = torch.tensor([episode_terminated], dtype=torch.float32).to(self.device)
 
         if self.current_size < self.max_size:
@@ -65,10 +63,8 @@ class ExperienceManager:
         self.current_size = 0
         self.next_index = 0
 
+
 # TODO: implement n-step return
-# TODO: implement target network
-# TODO: implement replay memory
-# TODO: make pass_posterior_to_prior more modular (some constants should be parameters)
 class ValueModelManager:
     def __init__(self, state_size: List[int], actions_amount: int, gamma: float, batch_size: int, learning_rate: float, kl_weight: float,
                  updates_to_pass_posterior: int, experience_replay_max_size: int, updates_to_renew_target_network: int, device: torch.device):
@@ -89,15 +85,15 @@ class ValueModelManager:
         self.updates_to_pass_posterior: int = updates_to_pass_posterior
         self.updates_count: int = 0
 
-    def sample_state_q_values(self, state: List[float]) -> Tensor:
-        state_tensor: Tensor = torch.tensor(state, dtype=torch.float32).to(self.device)
+    def sample_state_q_values(self, state: Tensor) -> Tensor:
+        state_tensor: Tensor = state.to(self.device)
         q_values: Tensor
         q_values, _, _ = self.policy_network(state_tensor)
         return q_values
     
-    def detailed_sample_state_q_values(self, state: List[float]) -> Tensor:
-        state_tensor: Tensor = torch.tensor(state, dtype=torch.float32).to(self.device)
-        return self.policy_network(state_tensor)
+    def detailed_sample_state_q_values(self, state: Tensor) -> Tensor:
+        state = state.to(self.device)
+        return self.policy_network(state)
     
     def multisample_state_q_values(self, state: List[float], sample_size: int) -> Tensor:
         samples: List[Tensor] = [self.sample_state_q_values(state) for _ in range(sample_size)]
@@ -150,9 +146,9 @@ class ValueModelManager:
 
 
 class VPIDQN(RLModel):
-    def __init__(self, state_size: List[int], actions_amount: int, gamma: float = 0.99, value_lr: float = 6e-4, value_kl_weight: float = 0.1, 
-                 value_batch_size: int = 32, updates_to_pass_posterior: int = 512, experience_replay_max_size: int = 8192, 
-                 updates_to_renew_target_network: int = 128):
+    def __init__(self, state_size: List[int], actions_amount: int, gamma: float = 0.99, value_lr: float = 3e-4, value_kl_weight: float = 0.1, 
+                 value_batch_size: int = 32, updates_to_pass_posterior: int = 512, experience_replay_max_size: int = 4096, 
+                 updates_to_renew_target_network: int = 256, min_eps: float = 0.1, eps_decay_rate: float = 0.999):
         super().__init__(state_size, actions_amount, gamma)
         self.value_model_manager: ValueModelManager = ValueModelManager(state_size, actions_amount, gamma, value_batch_size, value_lr, value_kl_weight, 
                                                                         updates_to_pass_posterior, experience_replay_max_size, updates_to_renew_target_network,
@@ -163,10 +159,14 @@ class VPIDQN(RLModel):
         self.updates_to_pass_posterior: int = updates_to_pass_posterior
         self.experience_replay_max_size: int = experience_replay_max_size
         self.updates_to_renew_target_network: int = updates_to_renew_target_network
+
+        self.min_eps: float = min_eps
+        self.eps_decay_rate: float = eps_decay_rate
+        self.eps: float = 1.0
+        print(f"eps will go from 1.0 to {self.min_eps} in {round(np.log(self.min_eps) / np.log(self.eps_decay_rate))} steps")
     
-    def get_next_action(self, state: List[float]) -> int:
-        eps: float = 0.1
-        if np.random.random() > eps:
+    def get_next_action(self, state: Tensor) -> int:
+        if np.random.random() > self.eps:
             q_values: Tensor = self.value_model_manager.sample_state_q_values(state)
             return q_values.argmax(dim=-1).item()
 
@@ -210,13 +210,15 @@ class VPIDQN(RLModel):
         return vpis.multinomial(1).item()
 
 
-    def inference_next_action(self, state: List[float]) -> int:
+    def inference_next_action(self, state: Tensor) -> int:
         with torch.no_grad():
             sample_q_value, q_value_r1, q_value_r2 = self.value_model_manager.detailed_sample_state_q_values(state)
             return ((q_value_r1 + q_value_r2) / 2.0).argmax(dim=-1).item()
     
-    def improve(self, state: List[float], action: int, reward: float, next_state: List[float], episode_terminated: bool) -> None:
+    def improve(self, state: Tensor, action: int, reward: float, next_state: Tensor, episode_terminated: bool) -> None:
         self.value_model_manager.improve(state, action, reward, next_state, episode_terminated)
+        if self.eps > self.min_eps:
+            self.eps = max(self.min_eps, self.eps * self.eps_decay_rate)
 
 
     def get_params_dict(self):
@@ -228,13 +230,16 @@ class VPIDQN(RLModel):
             "value_batch_size": self.value_batch_size,
             "uptades_to_pass_posterior": self.updates_to_pass_posterior,
             "experience_replay_max_size": self.experience_replay_max_size,
-            "updates_to_renew_target_network": self.updates_to_renew_target_network
+            "updates_to_renew_target_network": self.updates_to_renew_target_network,
+            "min_eps": self.min_eps,
+            "eps_decay_rate": self.eps_decay_rate
         }
         return param_dict
 
     def new(self) -> VPIDQN:
         return VPIDQN(self.state_size, self.actions_amount, self.gamma, self.value_lr, self.value_kl_weight, self.value_batch_size,
-                      self.updates_to_pass_posterior, self.experience_replay_max_size, self.updates_to_renew_target_network)
+                      self.updates_to_pass_posterior, self.experience_replay_max_size, self.updates_to_renew_target_network,
+                      self.min_eps, self.eps_decay_rate)
 
 
 

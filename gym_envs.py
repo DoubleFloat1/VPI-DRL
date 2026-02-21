@@ -2,6 +2,9 @@ from typing import List, Tuple, Dict, Any
 from numpy import ndarray
 import numpy as np
 import gymnasium as gym
+import torch
+import torchvision.transforms as T
+from torch import Tensor
 
 class GymEnv:
     def __init__(self):
@@ -10,7 +13,7 @@ class GymEnv:
         self.actions_amount: int = -1
 
     def preprocess(self, x):
-        return x
+        return torch.tensor(x, dtype=torch.float32)
     
     def end_episode(self) -> None:
         pass
@@ -25,23 +28,29 @@ class ImageGymEnv(GymEnv):
     def __init__(self):
         super().__init__()
         self.frame_stack_size: int = 4
-        self.frames: List[ndarray] = None
+        self.frames: List[Tensor] = None
     
     def initialize_frame_stack(self) -> None:
         frame_size = self.state_size.copy()
         frame_size[0] = frame_size[0] // self.frame_stack_size
-        self.frames = [np.zeros(frame_size) for _ in range(self.frame_stack_size)]
+        self.frames = [torch.zeros(frame_size) for _ in range(self.frame_stack_size)]
+        self.transformations: T.Compose = T.Compose([T.ToPILImage(), T.Grayscale(), T.Resize(self.state_size[1:]), T.ToTensor()])
     
     def add_frame(self, x) -> None:
         for i in range(self.frame_stack_size - 1):
             self.frames[i] = self.frames[i+1]
         self.frames[-1] = x
     
-    def get_frame_stack(self) -> ndarray:
-        return np.concat(self.frames)
+    def get_frame_stack(self) -> Tensor:
+        return torch.cat(self.frames)
     
     def end_episode(self):
         self.initialize_frame_stack()
+
+    def preprocess(self, x: ndarray):
+        x = self.transformations(x)
+        self.add_frame(x)
+        return self.get_frame_stack()
 
 
 class Polecart(GymEnv):
@@ -62,7 +71,7 @@ class MarioBros(ImageGymEnv):
     def __init__(self):
         super().__init__()
         self.gym_name = "ALE/MarioBros-v5"
-        self.state_size = [self.frame_stack_size * 3, 210, 160]
+        self.state_size = [self.frame_stack_size * 1, 96, 96]
         self.actions_amount = 18
         self.initialize_frame_stack()
     
@@ -70,19 +79,7 @@ class MarioBros(ImageGymEnv):
         x = np.transpose(x, (2, 0, 1)) / 255.0
         self.add_frame(x)
         return self.get_frame_stack()
-    
-class CollectHealth(ImageGymEnv):
-    def __init__(self):
-        super().__init__()
-        self.gym_name = "MiniWorld-CollectHealth-v0"
-        self.state_size = [self.frame_stack_size * 3, 60, 80]
-        self.actions_amount = 8
-        self.initialize_frame_stack()
-    
-    def preprocess(self, x: ndarray):
-        x = np.transpose(x, (2, 0, 1)) / 255.0
-        self.add_frame(x)
-        return self.get_frame_stack()
+
     
 class Highway(GymEnv):
     def __init__(self):
@@ -98,28 +95,18 @@ class SpaceInvaders(ImageGymEnv):
     def __init__(self):
         super().__init__()
         self.gym_name = "ALE/SpaceInvaders-v5"
-        self.state_size = [self.frame_stack_size * 3, 210, 160]
+        self.state_size = [self.frame_stack_size * 1, 96, 96]
         self.actions_amount = 6
         self.initialize_frame_stack()
-    
-    def preprocess(self, x: ndarray):
-        x = np.transpose(x, (2, 0, 1)) / 255.0
-        self.add_frame(x)
-        return self.get_frame_stack()
     
 
 class CarRacing(ImageGymEnv):
     def __init__(self):
         super().__init__()
         self.gym_name = "CarRacing-v3"
-        self.state_size = [self.frame_stack_size * 3, 96, 96]
+        self.state_size = [self.frame_stack_size * 1, 96, 96]
         self.actions_amount = 5
         self.initialize_frame_stack()
-    
-    def preprocess(self, x: ndarray):
-        x = np.transpose(x, (2, 0, 1)) / 255.0
-        self.add_frame(x)
-        return self.get_frame_stack()
     
     def create_environment(self):
         return gym.make(self.gym_name, render_mode=None, continuous=False)
@@ -149,3 +136,12 @@ class RaceTrack(GymEnv):
 
     def create_environment(self):
         return gym.make(self.gym_name, render_mode=None, track_index=self.track_index)
+    
+
+class Breakout(ImageGymEnv):
+    def __init__(self):
+        super().__init__()
+        self.gym_name = "ALE/Breakout-v5"
+        self.state_size = [self.frame_stack_size * 1, 96, 96]
+        self.actions_amount = 4
+        self.initialize_frame_stack()

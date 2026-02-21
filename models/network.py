@@ -1,18 +1,9 @@
 import numpy as np
-import math
-import random
-
 import torch
 import torch.nn as nn
 from torch.nn.parameter import Parameter
-from torch.distributions.normal import Normal
 import torch.nn.functional as F
-
-import matplotlib.pyplot as plt
-import torchbnn as bnn
 from torch import Tensor
-from scipy.stats import norm
-
 from typing import List
 
 class ValueModel(nn.Module):
@@ -20,11 +11,11 @@ class ValueModel(nn.Module):
 		super().__init__()
 		if len(state_size) == 1:
 			self.model = nn.Sequential(
-				nn.Linear(state_size[0], 64),
+				nn.Linear(state_size[0], 512),
 				nn.ReLU(),
-				nn.Linear(64, 64),
+				nn.Linear(512, 512),
 				nn.ReLU(),
-				nn.Linear(64, actions_amount)
+				nn.Linear(512, actions_amount)
 			)
 		elif len(state_size) == 3:
 			height: int = state_size[1]
@@ -32,27 +23,27 @@ class ValueModel(nn.Module):
 			for _ in range(4):
 				height = height // 2
 				width = width // 2
-			flatten_size: int = 16 * height * width
+			flatten_size: int = 64 * height * width
 
 			self.model = nn.Sequential(
 				nn.Conv2d(state_size[0], 8, 3, padding=1),
 				nn.Conv2d(8, 8, 3, padding=1),
 				nn.MaxPool2d(2, 2),
-				nn.Conv2d(8, 8, 3, padding=1),
-				nn.Conv2d(8, 8, 3, padding=1),
-				nn.MaxPool2d(2, 2),
 				nn.Conv2d(8, 16, 3, padding=1),
 				nn.Conv2d(16, 16, 3, padding=1),
 				nn.MaxPool2d(2, 2),
-				nn.Conv2d(16, 16, 3, padding=1),
-				nn.Conv2d(16, 16, 3, padding=1),
+				nn.Conv2d(16, 32, 3, padding=1),
+				nn.Conv2d(32, 32, 3, padding=1),
+				nn.MaxPool2d(2, 2),
+				nn.Conv2d(32, 64, 3, padding=1),
+				nn.Conv2d(64, 64, 3, padding=1),
 				nn.MaxPool2d(2, 2),
 				nn.Flatten(start_dim=-3),
-				nn.Linear(flatten_size, 64),
+				nn.Linear(flatten_size, 512),
 				nn.ReLU(),
-				nn.Linear(64, 64),
+				nn.Linear(512, 512),
 				nn.ReLU(),
-				nn.Linear(64, actions_amount)
+				nn.Linear(512, actions_amount)
 			)
 	
 	def forward(self, x):
@@ -327,21 +318,21 @@ class BayesValueModelUniform(BayesModelUniform):
 
 		if len(state_size) == 1:
 			self.range1 = nn.Sequential(
-				nn.Linear(state_size[0], 64),
+				nn.Linear(state_size[0], 512),
 				nn.ReLU(),
-				nn.Linear(64, 64),
+				nn.Linear(512, 512),
 				nn.ReLU(),
 				#nn.Linear(64, out_features)
-				BayesLinear(64, actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
+				BayesLinear(512, actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
 			)
 
 			self.range2 = nn.Sequential(
-				nn.Linear(state_size[0], 64),
+				nn.Linear(state_size[0], 512),
 				nn.ReLU(),
-				nn.Linear(64, 64),
+				nn.Linear(512, 512),
 				nn.ReLU(),
 				#nn.Linear(64, out_features)
-				BayesLinear(64, actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
+				BayesLinear(512, actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
 			)
 		else:
 			height: int = state_size[1]
@@ -349,48 +340,48 @@ class BayesValueModelUniform(BayesModelUniform):
 			for _ in range(4):
 				height = height // 2
 				width = width // 2
-			flatten_size: int = 16 * height * width
+			flatten_size: int = 64 * height * width
 
 			self.range1 = nn.Sequential(
 				nn.Conv2d(state_size[0], 8, 3, padding=1),
 				nn.Conv2d(8, 8, 3, padding=1),
 				nn.MaxPool2d(2, 2),
-				nn.Conv2d(8, 8, 3, padding=1),
-				nn.Conv2d(8, 8, 3, padding=1),
-				nn.MaxPool2d(2, 2),
 				nn.Conv2d(8, 16, 3, padding=1),
 				nn.Conv2d(16, 16, 3, padding=1),
 				nn.MaxPool2d(2, 2),
-				nn.Conv2d(16, 16, 3, padding=1),
-				nn.Conv2d(16, 16, 3, padding=1),
+				nn.Conv2d(16, 32, 3, padding=1),
+				nn.Conv2d(32, 32, 3, padding=1),
+				nn.MaxPool2d(2, 2),
+				nn.Conv2d(32, 64, 3, padding=1),
+				nn.Conv2d(64, 64, 3, padding=1),
 				nn.MaxPool2d(2, 2),
 				nn.Flatten(start_dim=-3),
-				nn.Linear(flatten_size, 64),
+				nn.Linear(flatten_size, 512),
 				nn.ReLU(),
-				nn.Linear(64, 64),
+				nn.Linear(512, 512),
 				nn.ReLU(),
-				BayesLinear(64, actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
+				BayesLinear(512, actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
 			)
 
 			self.range2 = nn.Sequential(
 				nn.Conv2d(state_size[0], 8, 3, padding=1),
 				nn.Conv2d(8, 8, 3, padding=1),
 				nn.MaxPool2d(2, 2),
-				nn.Conv2d(8, 8, 3, padding=1),
-				nn.Conv2d(8, 8, 3, padding=1),
-				nn.MaxPool2d(2, 2),
 				nn.Conv2d(8, 16, 3, padding=1),
 				nn.Conv2d(16, 16, 3, padding=1),
 				nn.MaxPool2d(2, 2),
-				nn.Conv2d(16, 16, 3, padding=1),
-				nn.Conv2d(16, 16, 3, padding=1),
+				nn.Conv2d(16, 32, 3, padding=1),
+				nn.Conv2d(32, 32, 3, padding=1),
+				nn.MaxPool2d(2, 2),
+				nn.Conv2d(32, 64, 3, padding=1),
+				nn.Conv2d(64, 64, 3, padding=1),
 				nn.MaxPool2d(2, 2),
 				nn.Flatten(start_dim=-3),
-				nn.Linear(flatten_size, 64),
+				nn.Linear(flatten_size, 512),
 				nn.ReLU(),
-				nn.Linear(64, 64),
+				nn.Linear(512, 512),
 				nn.ReLU(),
-				BayesLinear(64, actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
+				BayesLinear(512, actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
 			)
 
 		self.range_min: float = 0.0

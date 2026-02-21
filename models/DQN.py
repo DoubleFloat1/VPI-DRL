@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import torch
-from torch import Tensor, FloatTensor, LongTensor
+from torch import Tensor
 from models.network import ValueModel
 from typing import List, Tuple, Dict
 from torch.optim import Optimizer, Adam
@@ -12,7 +12,6 @@ import copy
 class ExperienceManager:
     def __init__(self, max_size: int, batch_size: int, state_size: List[int], device: torch.device):
         self.device: torch.device = device
-
         self.state_size: List[int] = state_size
         self.max_size: int = max_size
         self.batch_size: int = batch_size
@@ -29,11 +28,11 @@ class ExperienceManager:
         self.current_size: int = 0
         self.next_index: int = 0
 
-    def add_experience(self, state: List[float], action: int, reward: float, next_state: List[float], episode_terminated: bool) -> None:
-        self.state_batch[self.next_index] = torch.tensor(state, dtype=torch.float32).to(self.device)
+    def add_experience(self, state: Tensor, action: int, reward: float, next_state: Tensor, episode_terminated: bool) -> None:
+        self.state_batch[self.next_index] = state.to(self.device)
         self.action_batch[self.next_index] = torch.tensor([action], dtype=torch.long).to(self.device)
         self.reward_batch[self.next_index] = torch.tensor([reward], dtype=torch.float32).to(self.device)
-        self.next_state_batch[self.next_index] = torch.tensor(next_state, dtype=torch.float32).to(self.device)
+        self.next_state_batch[self.next_index] = next_state.to(self.device)
         self.episode_terminated_batch[self.next_index] = torch.tensor([episode_terminated], dtype=torch.float32).to(self.device)
 
         if self.current_size < self.max_size:
@@ -45,7 +44,7 @@ class ExperienceManager:
         return self.current_size >= self.batch_size
     
     def get_batch(self) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
-        indexes: Tensor = torch.multinomial(self.multinomial_weights, self.batch_size)
+        indexes: Tensor = torch.multinomial(self.multinomial_weights, self.batch_size).to(self.device)
         s: Tensor = self.state_batch[indexes]
         a: Tensor = self.action_batch[indexes]
         r: Tensor = self.reward_batch[indexes]
@@ -83,16 +82,16 @@ class ValueModelManager:
         self.updates_to_renew_target_network: int = updates_to_renew_target_network
         self.update_count: int = 0
 
-    def get_state_q_values(self, state: List[float]) -> Tensor:
-        state_tensor: Tensor = torch.tensor(state, dtype=torch.float32).to(self.device)
+    def get_state_q_values(self, state: Tensor) -> Tensor:
+        state_tensor: Tensor = state.to(self.device)
         return self.policy_network(state_tensor)
     
-    def inference_get_state_q_values(self, state: List[float]) -> Tensor:
+    def inference_get_state_q_values(self, state: Tensor) -> Tensor:
         with torch.no_grad():
-            state_tensor: Tensor = torch.tensor(state, dtype=torch.float32).to(self.device)
+            state_tensor: Tensor = state.to(self.device)
             return self.policy_network(state_tensor)
 
-    def improve(self, state: List[float], action: int, reward: float, next_state: List[float], episode_terminated: bool) -> None:
+    def improve(self, state: Tensor, action: int, reward: float, next_state: Tensor, episode_terminated: bool) -> None:
         self.experience_manager.add_experience(state, action, reward, next_state, episode_terminated)
         if self.experience_manager.can_get_batch():
             self.update_model()
@@ -128,8 +127,8 @@ class ValueModelManager:
 
 # TODO: make eps variable with respect to time step
 class DQN(RLModel):
-    def __init__(self, state_size: List[int], actions_amount: int, gamma: float = 0.99, value_lr: float = 6e-4, value_batch_size: int = 32,
-                 experience_replay_max_size: int = 8192, updates_to_renew_target_network: int = 128):
+    def __init__(self, state_size: List[int], actions_amount: int, gamma: float = 0.99, value_lr: float = 3e-4, value_batch_size: int = 32,
+                 experience_replay_max_size: int = 4096, updates_to_renew_target_network: int = 256, min_eps: float = 0.1, eps_decay_rate: float = 0.999):
         super().__init__(state_size, actions_amount, gamma)
         self.value_model_manager: ValueModelManager = ValueModelManager(state_size, actions_amount, gamma, value_batch_size, value_lr,
                                                                         experience_replay_max_size, updates_to_renew_target_network, self.device)
@@ -138,22 +137,28 @@ class DQN(RLModel):
         self.experience_replay_max_size: int = experience_replay_max_size
         self.updates_to_renew_target_network: int = updates_to_renew_target_network
 
+        self.min_eps: float = min_eps
+        self.eps_decay_rate: float = eps_decay_rate
+        self.eps: float = 1.0
+        print(f"eps will go from 1.0 to {self.min_eps} in {round(np.log(self.min_eps) / np.log(self.eps_decay_rate))} steps")
+
     
-    def get_next_action(self, state: List[float]) -> int:
+    def get_next_action(self, state: Tensor) -> int:
         with torch.no_grad():
-            eps: float = 0.1
-            if np.random.random() <= eps:
+            if np.random.random() <= self.eps:
                 return np.random.randint(0, self.actions_amount)
             
             q_values: Tensor = self.value_model_manager.get_state_q_values(state)
             return q_values.argmax(dim=-1).item()
     
-    def inference_next_action(self, state: List[float]) -> int:
+    def inference_next_action(self, state: Tensor) -> int:
         q_values: Tensor = self.value_model_manager.inference_get_state_q_values(state)
         return q_values.argmax(dim=-1).item()
     
-    def improve(self, state: List[float], action: int, reward: float, next_state: List[float], episode_terminated: bool) -> None:
+    def improve(self, state: Tensor, action: int, reward: float, next_state: Tensor, episode_terminated: bool) -> None:
         self.value_model_manager.improve(state, action, reward, next_state, episode_terminated)
+        if self.eps > self.min_eps:
+            self.eps = max(self.min_eps, self.eps * self.eps_decay_rate)
 
     def get_params_dict(self):
         param_dict: Dict = {
@@ -162,10 +167,12 @@ class DQN(RLModel):
             "value_lr": self.value_lr,
             "value_batch_size": self.value_batch_size,
             "experience_replay_max_size": self.experience_replay_max_size,
-            "updates_to_renew_target_network": self.updates_to_renew_target_network
+            "updates_to_renew_target_network": self.updates_to_renew_target_network,
+            "min_eps": self.min_eps,
+            "eps_decay_rate": self.eps_decay_rate
         }
         return param_dict
     
     def new(self) -> DQN:
         return DQN(self.state_size, self.actions_amount, self.gamma, self.value_lr, self.value_batch_size, self.experience_replay_max_size,
-                   self.updates_to_renew_target_network)
+                   self.updates_to_renew_target_network, self.min_eps, self.eps_decay_rate)
