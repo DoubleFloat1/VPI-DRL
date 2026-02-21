@@ -64,6 +64,9 @@ def main():
     plot_file("vpidqn.txt",
               label="VPIDQN",
               color="blue")
+    plot_file("dqn.txt",
+              label="DQN",
+              color="red")
     
     plt.show()
 

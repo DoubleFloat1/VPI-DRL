@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import List
 import torch
 from typing import Dict, Any
@@ -8,7 +10,7 @@ class RLModel:
         self.actions_amount: int = actions_amount
         self.gamma: float = gamma
         self.device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.device = "cpu"
+        #self.device = "cpu"
 
     
     def get_next_action(self, state: List[float]) -> int:
@@ -22,3 +24,7 @@ class RLModel:
     
     def get_params_dict(self) -> Dict[str, Any]:
         return {"gamma": self.gamma}
+    
+    def new(self) -> RLModel:
+        raise NotImplementedError
+        

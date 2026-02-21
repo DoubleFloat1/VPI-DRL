@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import torch
 from torch import Tensor
-from network import BayesTransitionModel, BayesValueModel, BayesValueModelUniform
+from models.network import BayesTransitionModel, BayesValueModel, BayesValueModelUniform
 from typing import List, Tuple, Dict
 from torch.optim import Optimizer, Adam
 import numpy as np
-from rl_model import RLModel
+from models.rl_model import RLModel
 from scipy.stats import norm
 from numpy import ndarray
 import copy
@@ -148,7 +150,7 @@ class ValueModelManager:
 
 
 class VPIDQN(RLModel):
-    def __init__(self, state_size: List[int], actions_amount: int, gamma: float = 0.99, value_lr: float = 1e-3, value_kl_weight: float = 0.1, 
+    def __init__(self, state_size: List[int], actions_amount: int, gamma: float = 0.99, value_lr: float = 6e-4, value_kl_weight: float = 0.1, 
                  value_batch_size: int = 32, updates_to_pass_posterior: int = 512, experience_replay_max_size: int = 8192, 
                  updates_to_renew_target_network: int = 128):
         super().__init__(state_size, actions_amount, gamma)
@@ -158,7 +160,7 @@ class VPIDQN(RLModel):
         self.value_lr: float = value_lr
         self.value_kl_weight: float = value_kl_weight
         self.value_batch_size: int = value_batch_size
-        self.uptades_to_pass_posterior: int = updates_to_pass_posterior
+        self.updates_to_pass_posterior: int = updates_to_pass_posterior
         self.experience_replay_max_size: int = experience_replay_max_size
         self.updates_to_renew_target_network: int = updates_to_renew_target_network
     
@@ -224,13 +226,15 @@ class VPIDQN(RLModel):
             "value_lr": self.value_lr,
             "value_kl_weight": self.value_kl_weight,
             "value_batch_size": self.value_batch_size,
-            "uptades_to_pass_posterior": self.uptades_to_pass_posterior,
+            "uptades_to_pass_posterior": self.updates_to_pass_posterior,
             "experience_replay_max_size": self.experience_replay_max_size,
             "updates_to_renew_target_network": self.updates_to_renew_target_network
         }
         return param_dict
 
-
+    def new(self) -> VPIDQN:
+        return VPIDQN(self.state_size, self.actions_amount, self.gamma, self.value_lr, self.value_kl_weight, self.value_batch_size,
+                      self.updates_to_pass_posterior, self.experience_replay_max_size, self.updates_to_renew_target_network)
 
 
 
@@ -286,3 +290,17 @@ class TempVPIDQN2(VPIDQN):
         
         min_val: Tensor = (sample_q_values + vpis * self.vpi_const).min()
         return (sample_q_values + vpis * self.vpi_const - min_val + 1e-5).multinomial(1).item()
+    
+    def get_params_dict(self):
+        param_dict: Dict = {
+            "name": "VPIDQN",
+            "gamma": self.gamma,
+            "value_lr": self.value_lr,
+            "value_kl_weight": self.value_kl_weight,
+            "value_batch_size": self.value_batch_size,
+            "uptades_to_pass_posterior": self.updates_to_pass_posterior,
+            "experience_replay_max_size": self.experience_replay_max_size,
+            "updates_to_renew_target_network": self.updates_to_renew_target_network,
+            "vpi_const": self.vpi_const
+        }
+        return param_dict

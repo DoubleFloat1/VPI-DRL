@@ -1,6 +1,6 @@
-from VPIDQN import VPIDQN, TempVPIDQN2
-from DQN import DQN
-from rl_model import RLModel
+from models.VPIDQN import VPIDQN, TempVPIDQN2
+from models.DQN import DQN
+from models.rl_model import RLModel
 import gymnasium as gym
 from gymnasium import Env
 from typing import List, Tuple, Dict, Any
@@ -103,15 +103,15 @@ class TestManager:
 
 
 class ResultWriter:
-    def __init__(self, file_name: str, create_new_file: bool = True):
+    def __init__(self, file_name: str, gym_env: GymEnv, model: RLModel, train_step_amount: int, create_new_file: bool = True):
         self.trials_rewards: List[List[float]] = []
         self.file_name: str = file_name
         if create_new_file:
             open(self.file_name, 'w').close()
         
-        self.gym_env: GymEnv = None
-        self.model: RLModel = None
-        self.train_step_amount: int = -1
+        self.gym_env: GymEnv = gym_env
+        self.model: RLModel = model
+        self.train_step_amount: int = train_step_amount
     
     def set_gym_env(self, gym_env: GymEnv) -> None:
         self.gym_env = gym_env
@@ -161,16 +161,11 @@ class ResultWriter:
 
 
 
-def main(gym_env: GymEnv, data_file: str, model_type: float, create_new_data_file: bool = True, training_epochs: int = 0,
+def main(gym_env: GymEnv, model_type: RLModel, data_file: str, create_new_data_file: bool = True, training_epochs: int = 20,
          test_episode_amount: int = 100, train_step_amount: int = 2000, trials_repeat: int = 10):
-    writer = ResultWriter(data_file, create_new_data_file)
-    writer.set_gym_env(gym_env)
+    writer = ResultWriter(data_file, gym_env, model_type, train_step_amount, create_new_data_file)
     for t in range(trials_repeat):
-        print(f"trial {t}")
-
-        model = VPIDQN(gym_env.state_size, gym_env.actions_amount)
-        writer.set_model(model)
-
+        model: RLModel = model_type.new()
         train_manager: TrainManager = TrainManager(gym_env, 4)
         test_manager: TestManager = TestManager(gym_env)
 
@@ -179,7 +174,7 @@ def main(gym_env: GymEnv, data_file: str, model_type: float, create_new_data_fil
         print(sum(rewards) / len(rewards))
         mean_reward_history.append(sum(rewards) / len(rewards))
         for i in range(training_epochs):
-            print(f"Epoch {i}")
+            print(f"Trial {t} - Epoch {i}")
 
             start = time.perf_counter()
             train_manager.train_model(model, train_step_amount)
@@ -195,5 +190,8 @@ def main(gym_env: GymEnv, data_file: str, model_type: float, create_new_data_fil
 
 
 if __name__ == "__main__":
-    gym_env = LunarLander()
-    main(gym_env, "vpidqn.txt", 0.0, test_episode_amount=10, training_epochs=20, train_step_amount=10)
+    gym_env = SpaceInvaders()
+    dqn = DQN(gym_env.state_size, gym_env.actions_amount)
+    vpidqn = VPIDQN(gym_env.state_size, gym_env.actions_amount)
+    main(gym_env, dqn, "dqn.txt", test_episode_amount=100, training_epochs=40, train_step_amount=1000)
+    main(gym_env, vpidqn, "vpidqn.txt", test_episode_amount=100, training_epochs=40, train_step_amount=1000)

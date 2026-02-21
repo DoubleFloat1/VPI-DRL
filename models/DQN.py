@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import torch
 from torch import Tensor, FloatTensor, LongTensor
-from network import ValueModel
+from models.network import ValueModel
 from typing import List, Tuple, Dict
 from torch.optim import Optimizer, Adam
 import numpy as np
-from rl_model import RLModel
+from models.rl_model import RLModel
 import copy
 
 class ExperienceManager:
@@ -126,7 +128,7 @@ class ValueModelManager:
 
 # TODO: make eps variable with respect to time step
 class DQN(RLModel):
-    def __init__(self, state_size: List[int], actions_amount: int, gamma: float = 0.99, value_lr: float = 1e-3, value_batch_size: int = 32,
+    def __init__(self, state_size: List[int], actions_amount: int, gamma: float = 0.99, value_lr: float = 6e-4, value_batch_size: int = 32,
                  experience_replay_max_size: int = 8192, updates_to_renew_target_network: int = 128):
         super().__init__(state_size, actions_amount, gamma)
         self.value_model_manager: ValueModelManager = ValueModelManager(state_size, actions_amount, gamma, value_batch_size, value_lr,
@@ -163,3 +165,7 @@ class DQN(RLModel):
             "updates_to_renew_target_network": self.updates_to_renew_target_network
         }
         return param_dict
+    
+    def new(self) -> DQN:
+        return DQN(self.state_size, self.actions_amount, self.gamma, self.value_lr, self.value_batch_size, self.experience_replay_max_size,
+                   self.updates_to_renew_target_network)
