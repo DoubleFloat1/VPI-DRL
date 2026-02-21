@@ -1,7 +1,7 @@
 import numpy as np
 from numpy import ndarray
 import matplotlib.pyplot as plt
-from typing import List
+from typing import List, Tuple
 
 
 class Data:
@@ -18,27 +18,29 @@ class Data:
         return self.matrix.std(axis=0)
         
 
-def extract_file_data(filepath: str, skip_first_line: bool = True) -> Data:
+def extract_file_data(filepath: str) -> Tuple[Data, int]:
     matrix: List[List[float]] = []
+    train_step_amount: int = -1
     with open(filepath, 'r') as file:
-        if skip_first_line:
-            file.readline()
-
-        line: str
-        for line in file:
+        train_step_amount = int(file.readline())
+        (rows, cols) = [int(x) for x in file.readline().split(' ')]
+        for _ in range(rows):
+            line = file.readline()
             row: List[float] = [float(x) for x in line.split(' ')]
             matrix.append(row)
-    
-    return Data(matrix)
 
-def plot_file(filepath: str, skip_first_line: bool = True,
-              x_vals: List[float] | ndarray[float] = None, color: str = None, label: str = None) -> None:
-    data: Data = extract_file_data(filepath, skip_first_line=skip_first_line)
+    
+    return Data(matrix), train_step_amount
+
+def plot_file(filepath: str, x_vals: List[float] | ndarray[float] = None, color: str = None, label: str = None) -> None:
+    data: Data
+    train_step_amount: int
+    data, train_step_amount = extract_file_data(filepath)
     mean: ndarray[float] = data.get_col_mean()
     std: ndarray[float] = data.get_col_std()
 
     if x_vals == None:
-        x_vals = [float(i+1)*10000 for i in range(data.cols)]
+        x_vals = [float(i)*train_step_amount for i in range(data.cols)]
 
     plt.plot(x_vals, mean, color=color, label=label)
 
@@ -60,13 +62,8 @@ def main():
     )
     
     plot_file("vpidqn.txt",
-              color="blue",
               label="VPIDQN",
-              skip_first_line=False)
-    plot_file("dqn.txt",
-              color="red",
-              label="DQN",
-              skip_first_line=False)
+              color="blue")
     
     plt.show()
 

@@ -1,6 +1,7 @@
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Any
 from numpy import ndarray
 import numpy as np
+import gymnasium as gym
 
 class GymEnv:
     def __init__(self):
@@ -13,6 +14,12 @@ class GymEnv:
     
     def end_episode(self) -> None:
         pass
+
+    def create_environment(self) -> gym.Env:
+        return gym.make(self.gym_name, render_mode=None)
+    
+    def get_params_dict(self) -> Dict[str, Any]:
+        return {"gym_id": self.gym_name}
     
 class ImageGymEnv(GymEnv):
     def __init__(self):
@@ -99,3 +106,46 @@ class SpaceInvaders(ImageGymEnv):
         x = np.transpose(x, (2, 0, 1)) / 255.0
         self.add_frame(x)
         return self.get_frame_stack()
+    
+
+class CarRacing(ImageGymEnv):
+    def __init__(self):
+        super().__init__()
+        self.gym_name = "CarRacing-v3"
+        self.state_size = [self.frame_stack_size * 3, 96, 96]
+        self.actions_amount = 5
+        self.initialize_frame_stack()
+    
+    def preprocess(self, x: ndarray):
+        x = np.transpose(x, (2, 0, 1)) / 255.0
+        self.add_frame(x)
+        return self.get_frame_stack()
+    
+    def create_environment(self):
+        return gym.make(self.gym_name, render_mode=None, continuous=False)
+    
+
+class RaceTrack(GymEnv):
+    def __init__(self, track_index: int = 0):
+        super().__init__()
+        self.gym_name = "custom_envs/RaceTrack-v0"
+        self.state_size = [4]
+        self.actions_amount = 9
+
+        self.track_index = track_index
+    
+    def preprocess(self, x):
+        if self.track_index == 0:
+            x[0] = x[0] / 30.0
+            x[1] = x[1] / 33.0
+            x[2] = x[2] / 30.0
+            x[3] = x[3] / 33.0
+        elif self.track_index == 1:
+            x[0] = x[0] / 30.0
+            x[1] = x[1] / 80.0
+            x[2] = x[2] / 30.0
+            x[3] = x[3] / 80.0
+        return x
+
+    def create_environment(self):
+        return gym.make(self.gym_name, render_mode=None, track_index=self.track_index)

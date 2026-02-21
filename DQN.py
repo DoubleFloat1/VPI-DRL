@@ -127,10 +127,14 @@ class ValueModelManager:
 # TODO: make eps variable with respect to time step
 class DQN(RLModel):
     def __init__(self, state_size: List[int], actions_amount: int, gamma: float = 0.99, value_lr: float = 1e-3, value_batch_size: int = 32,
-                 experience_replay_max_size: int = 1024, updates_to_renew_target_network: int = 128):
+                 experience_replay_max_size: int = 8192, updates_to_renew_target_network: int = 128):
         super().__init__(state_size, actions_amount, gamma)
         self.value_model_manager: ValueModelManager = ValueModelManager(state_size, actions_amount, gamma, value_batch_size, value_lr,
                                                                         experience_replay_max_size, updates_to_renew_target_network, self.device)
+        self.value_lr: float = value_lr
+        self.value_batch_size: int = value_batch_size
+        self.experience_replay_max_size: int = experience_replay_max_size
+        self.updates_to_renew_target_network: int = updates_to_renew_target_network
 
     
     def get_next_action(self, state: List[float]) -> int:
@@ -149,3 +153,13 @@ class DQN(RLModel):
     def improve(self, state: List[float], action: int, reward: float, next_state: List[float], episode_terminated: bool) -> None:
         self.value_model_manager.improve(state, action, reward, next_state, episode_terminated)
 
+    def get_params_dict(self):
+        param_dict: Dict = {
+            "name": "DQN",
+            "gamma": self.gamma,
+            "value_lr": self.value_lr,
+            "value_batch_size": self.value_batch_size,
+            "experience_replay_max_size": self.experience_replay_max_size,
+            "updates_to_renew_target_network": self.updates_to_renew_target_network
+        }
+        return param_dict

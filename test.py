@@ -1,12 +1,13 @@
-from VPIDQN import VPIDQN
+from VPIDQN import VPIDQN, TempVPIDQN2
 from DQN import DQN
 from rl_model import RLModel
 import gymnasium as gym
 from gymnasium import Env
-from typing import List
+from typing import List, Tuple, Dict, Any
 from numpy import ndarray
 import time
 from gym_envs import *
+from custom_envs.race_track import RacetrackEnv
 
 import ale_py
 import miniworld
@@ -16,6 +17,7 @@ import highway_env
 gym.register_envs(ale_py)
 gym.register_envs(miniworld)
 gym.register_envs(highway_env)
+gym.register(id="custom_envs/RaceTrack-v0", entry_point=RacetrackEnv)
 
 class EnvironmentWrapper:
     def __init__(self, env: Env):
@@ -43,7 +45,7 @@ class EnvironmentWrapper:
 class TrainManager:
     def __init__(self, gym_env: GymEnv, envs_amount: int):
         self.gym_env: GymEnv = gym_env
-        self.envs: List[EnvironmentWrapper] = [EnvironmentWrapper(gym.make(gym_env.gym_name, render_mode=None)) for _ in range(envs_amount)]
+        self.envs: List[EnvironmentWrapper] = [EnvironmentWrapper(gym_env.create_environment()) for _ in range(envs_amount)]
     
     def train_model(self, model: VPIDQN, steps_amount: int) -> None:
         for t in range(steps_amount):
@@ -62,29 +64,11 @@ class TrainManager:
                     env.reset()
                     self.gym_env.end_episode()
         print()
-    
-    def vpi_train_model(self, model: VPIDQN, steps_amount: int) -> None:
-        for t in range(steps_amount):
-            print(f"Training: {100 * t / (steps_amount - 1):.2f}%", end="\r")
-
-            for env in self.envs:
-                state = env.get_current_state()
-                state = self.gym_env.preprocess(state)
-                action = model.vpi_get_next_action(state)
-
-                next_state, reward, terminated, truncated = env.step(action)
-                next_state = self.gym_env.preprocess(next_state)
-                model.improve(state, action, reward, next_state, terminated)
-
-                if terminated or truncated:
-                    env.reset()
-                    self.gym_env.end_episode()
-        print()
 
 class TestManager:
     def __init__(self, gym_env: GymEnv):
         self.gym_env: GymEnv = gym_env
-        self.test_env: EnvironmentWrapper = EnvironmentWrapper(gym.make(gym_env.gym_name, render_mode=None))
+        self.test_env: EnvironmentWrapper = EnvironmentWrapper(gym_env.create_environment())
     
     def test_model(self, model: RLModel, episodes_amount: int) -> List[float]:
         episode_count = 0
@@ -100,6 +84,7 @@ class TestManager:
                 pass
                 #print(step_count)
             state = self.test_env.get_current_state()
+            #print(state)
             state = self.gym_env.preprocess(state)
             action = model.inference_next_action(state)
             _, reward, terminated, truncated = self.test_env.step(action)
@@ -118,26 +103,54 @@ class TestManager:
 
 
 class ResultWriter:
-    def __init__(self, file_name: str):
-        self.trials_rewards = []
+    def __init__(self, file_name: str, create_new_file: bool = True):
+        self.trials_rewards: List[List[float]] = []
         self.file_name: str = file_name
-        open(self.file_name, 'w').close()
+        if create_new_file:
+            open(self.file_name, 'w').close()
+        
+        self.gym_env: GymEnv = None
+        self.model: RLModel = None
+        self.train_step_amount: int = -1
     
-    def add_trial_rewards(self, rewards):
+    def set_gym_env(self, gym_env: GymEnv) -> None:
+        self.gym_env = gym_env
+    
+    def set_model(self, model: RLModel) -> None:
+        self.model = model
+
+    def set_train_step_amount(self, amount: int) -> None:
+        self.train_step_amount = amount
+
+    def add_trial_rewards(self, rewards: List[float]) -> None:
         self.trials_rewards.append(rewards)
     
-    def write(self):
+    def write(self) -> None:
         with open(self.file_name, 'w') as file:
+            file.write(f"{self.train_step_amount}\n")
+            file.write(f"{len(self.trials_rewards)} {len(self.trials_rewards[0])}\n")
             for rewards in self.trials_rewards:
                 string = self.list_to_str(rewards)
                 file.write(string + "\n")
+            
+            file.write("\nEnvironment params:\n")
+            env_params_dict: Dict[str, Any] = self.gym_env.get_params_dict()
+            for param_name in env_params_dict.keys():
+                param = env_params_dict[param_name]
+                file.write(f"{param_name} = {param}\n")
+
+            file.write("\nModel params:\n")
+            model_params_dict: Dict[str, Any] = self.model.get_params_dict()
+            for param_name in model_params_dict.keys():
+                param = model_params_dict[param_name]
+                file.write(f"{param_name} = {param}\n")
     
-    def write_line(self, rewards):
+    def write_line(self, rewards: List[float]):
         with open(self.file_name, 'a') as file:
             string = self.list_to_str(rewards)
             file.write(string + "\n")
     
-    def list_to_str(self, array):
+    def list_to_str(self, array: List[float]) -> str:
         n = len(array)
         string = ""
         for i in range(n):
@@ -147,54 +160,40 @@ class ResultWriter:
         return string
 
 
-gym_env: GymEnv = SpaceInvaders()
 
-normal_training_epochs: int = 20
-vpi_training_epochs: int = 0
+def main(gym_env: GymEnv, data_file: str, model_type: float, create_new_data_file: bool = True, training_epochs: int = 0,
+         test_episode_amount: int = 100, train_step_amount: int = 2000, trials_repeat: int = 10):
+    writer = ResultWriter(data_file, create_new_data_file)
+    writer.set_gym_env(gym_env)
+    for t in range(trials_repeat):
+        print(f"trial {t}")
 
-test_episode_amount: int = 10
-train_step_amount: int = 2000
+        model = VPIDQN(gym_env.state_size, gym_env.actions_amount)
+        writer.set_model(model)
 
-writer = ResultWriter("dqn.txt")
+        train_manager: TrainManager = TrainManager(gym_env, 4)
+        test_manager: TestManager = TestManager(gym_env)
 
-for t in range(10):
-    print(f"trial {t}")
-
-    model = DQN(gym_env.state_size, gym_env.actions_amount)
-    train_manager: TrainManager = TrainManager(gym_env, 4)
-    test_manager: TestManager = TestManager(gym_env)
-
-    mean_reward_history = []
-    rewards = test_manager.test_model(model, test_episode_amount)
-    print(sum(rewards) / len(rewards))
-    mean_reward_history.append(sum(rewards) / len(rewards))
-    for i in range(normal_training_epochs):
-        print(f"Epoch {i}")
-
-        start = time.perf_counter()
-        train_manager.train_model(model, train_step_amount)
-        end = time.perf_counter()
-        print(f"{end - start:.3f}s")
-
+        mean_reward_history = []
         rewards = test_manager.test_model(model, test_episode_amount)
         print(sum(rewards) / len(rewards))
         mean_reward_history.append(sum(rewards) / len(rewards))
+        for i in range(training_epochs):
+            print(f"Epoch {i}")
 
-    print("Now with VPI")
+            start = time.perf_counter()
+            train_manager.train_model(model, train_step_amount)
+            end = time.perf_counter()
+            print(f"{end - start:.3f}s")
 
-    for i in range(normal_training_epochs, normal_training_epochs + vpi_training_epochs):
-        print(f"Epoch {i}")
+            rewards = test_manager.test_model(model, test_episode_amount)
+            print(sum(rewards) / len(rewards))
+            mean_reward_history.append(sum(rewards) / len(rewards))
 
-        start = time.perf_counter()
-        train_manager.vpi_train_model(model, train_step_amount)
-        end = time.perf_counter()
-        print(f"{end - start:.3f}s")
+        writer.add_trial_rewards(mean_reward_history)
+        writer.write()
 
-        rewards = test_manager.test_model(model, test_episode_amount)
-        print(sum(rewards) / len(rewards))
-        mean_reward_history.append(sum(rewards) / len(rewards))
 
-    writer.add_trial_rewards(mean_reward_history)
-    writer.write_line(mean_reward_history)
-
-writer.write()
+if __name__ == "__main__":
+    gym_env = LunarLander()
+    main(gym_env, "vpidqn.txt", 0.0, test_episode_amount=10, training_epochs=20, train_step_amount=10)
