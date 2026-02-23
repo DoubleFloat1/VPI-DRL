@@ -61,12 +61,11 @@ def main():
         y_axis_name="Recompensa média"
     )
     
-    plot_file("data/space_invader/vpidqn.txt",
-              label="VPIDQN",
-              color="blue")
-    plot_file("data/space_invader/dqn.txt",
-              label="DQN",
-              color="red")
+    #plot_file("data/lunar_lander/vpidqn.txt", label="VPIDQN", color="blue")
+    #plot_file("data/lunar_lander/dqn.txt", label="DQN", color="red")
+
+    #plot_file("vpidqn.txt", label="VPIDQN", color="blue")
+    plot_file("dqn.txt", label="DQN", color="red")
     
     plt.show()
 

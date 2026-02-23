@@ -128,7 +128,8 @@ class ValueModelManager:
 # TODO: make eps variable with respect to time step
 class DQN(RLModel):
     def __init__(self, state_size: List[int], actions_amount: int, gamma: float = 0.99, value_lr: float = 3e-4, value_batch_size: int = 32,
-                 experience_replay_max_size: int = 4096, updates_to_renew_target_network: int = 256, min_eps: float = 0.1, eps_decay_rate: float = 0.999):
+                 experience_replay_max_size: int = 4096, updates_to_renew_target_network: int = 256, 
+                 initial_eps: float = 0.5, min_eps: float = 0.1, total_steps_of_eps_decay: int = 100000):
         super().__init__(state_size, actions_amount, gamma)
         self.value_model_manager: ValueModelManager = ValueModelManager(state_size, actions_amount, gamma, value_batch_size, value_lr,
                                                                         experience_replay_max_size, updates_to_renew_target_network, self.device)
@@ -137,10 +138,13 @@ class DQN(RLModel):
         self.experience_replay_max_size: int = experience_replay_max_size
         self.updates_to_renew_target_network: int = updates_to_renew_target_network
 
+        self.initial_eps: float = initial_eps
         self.min_eps: float = min_eps
-        self.eps_decay_rate: float = eps_decay_rate
-        self.eps: float = 1.0
-        print(f"eps will go from 1.0 to {self.min_eps} in {round(np.log(self.min_eps) / np.log(self.eps_decay_rate))} steps")
+        self.total_steps_of_eps_decay: int = total_steps_of_eps_decay
+        self.eps_decay_step_count: int = 0
+
+        self.eps: float = initial_eps
+        print(f"eps will go from {self.initial_eps} to {self.min_eps} in {self.total_steps_of_eps_decay} steps")
 
     
     def get_next_action(self, state: Tensor) -> int:
@@ -158,7 +162,9 @@ class DQN(RLModel):
     def improve(self, state: Tensor, action: int, reward: float, next_state: Tensor, episode_terminated: bool) -> None:
         self.value_model_manager.improve(state, action, reward, next_state, episode_terminated)
         if self.eps > self.min_eps:
-            self.eps = max(self.min_eps, self.eps * self.eps_decay_rate)
+            self.eps_decay_step_count += 1
+            proportion: float = self.eps_decay_step_count / self.total_steps_of_eps_decay
+            self.eps = proportion * self.min_eps + (1 - proportion) * self.initial_eps
 
     def get_params_dict(self):
         param_dict: Dict = {
@@ -168,11 +174,12 @@ class DQN(RLModel):
             "value_batch_size": self.value_batch_size,
             "experience_replay_max_size": self.experience_replay_max_size,
             "updates_to_renew_target_network": self.updates_to_renew_target_network,
+            "initial_eps": self.initial_eps,
             "min_eps": self.min_eps,
-            "eps_decay_rate": self.eps_decay_rate
+            "total_steps_of_eps_decay": self.total_steps_of_eps_decay
         }
         return param_dict
     
     def new(self) -> DQN:
         return DQN(self.state_size, self.actions_amount, self.gamma, self.value_lr, self.value_batch_size, self.experience_replay_max_size,
-                   self.updates_to_renew_target_network, self.min_eps, self.eps_decay_rate)
+                   self.updates_to_renew_target_network, self.initial_eps, self.min_eps, self.total_steps_of_eps_decay)

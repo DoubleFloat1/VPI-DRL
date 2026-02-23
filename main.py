@@ -160,9 +160,9 @@ class ResultWriter:
 
 
 def main(gym_env: GymEnv, model_type: RLModel, data_file: str, create_new_data_file: bool = True, training_epochs: int = 20,
-         test_episode_amount: int = 100, train_step_amount: int = 2000, trials_repeat: int = 10):
+         test_episode_amount: int = 100, train_step_amount: int = 2000, trials_amount: int = 10):
     writer = ResultWriter(data_file, gym_env, model_type, train_step_amount, create_new_data_file)
-    for t in range(trials_repeat):
+    for t in range(trials_amount):
         model: RLModel = model_type.new()
         train_manager: TrainManager = TrainManager(gym_env, 1)
         test_manager: TestManager = TestManager(gym_env)
@@ -188,8 +188,31 @@ def main(gym_env: GymEnv, model_type: RLModel, data_file: str, create_new_data_f
 
 
 if __name__ == "__main__":
-    gym_env = SpaceInvaders()
-    #dqn = DQN(gym_env.state_size, gym_env.actions_amount, experience_replay_max_size=8192)
-    vpidqn = VPIDQN(gym_env.state_size, gym_env.actions_amount, experience_replay_max_size=2048)
-    #main(gym_env, dqn, "dqn.txt", test_episode_amount=10, training_epochs=40, train_step_amount=1000)
-    main(gym_env, vpidqn, "vpidqn.txt", test_episode_amount=10, training_epochs=40, train_step_amount=1000)
+    gym_env = Breakout()
+
+    train_step_amount: int = 5000
+    training_epochs: int = 100
+    test_episode_amount: int = 20
+    trials_amount: int = 1
+
+    total_steps_of_eps_decay: int = round(0.5 * train_step_amount * training_epochs)
+    dqn = DQN(gym_env.state_size, gym_env.actions_amount, 
+              experience_replay_max_size=8192,
+              updates_to_renew_target_network=2000,
+              initial_eps=0.5,
+              min_eps=0.1,
+              total_steps_of_eps_decay=total_steps_of_eps_decay
+              )
+    
+    vpidqn = VPIDQN(gym_env.state_size, gym_env.actions_amount, 
+                    experience_replay_max_size=8192,
+                    updates_to_renew_target_network=2000,
+                    value_kl_weight=0.1,
+                    updates_to_pass_posterior=3000,
+                    initial_eps=0.5,
+                    min_eps=0.1,
+                    total_steps_of_eps_decay=total_steps_of_eps_decay
+                    )
+
+    main(gym_env, dqn, "dqn.txt", train_step_amount=train_step_amount, training_epochs=training_epochs, test_episode_amount=test_episode_amount,trials_amount=trials_amount)
+    main(gym_env, vpidqn, "vpidqn.txt", train_step_amount=train_step_amount, training_epochs=training_epochs, test_episode_amount=test_episode_amount,trials_amount=trials_amount)

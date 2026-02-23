@@ -5,12 +5,14 @@ import gymnasium as gym
 import torch
 import torchvision.transforms as T
 from torch import Tensor
+from gym_wrappers import AtariWrapper
 
 class GymEnv:
     def __init__(self):
         self.gym_name: str = ""
         self.state_size: List[int] = []
         self.actions_amount: int = -1
+        self.image_state: bool = False
 
     def preprocess(self, x):
         return torch.tensor(x, dtype=torch.float32)
@@ -27,6 +29,7 @@ class GymEnv:
 class ImageGymEnv(GymEnv):
     def __init__(self):
         super().__init__()
+        self.image_state = True
         self.frame_stack_size: int = 4
         self.frames: List[Tensor] = None
     
@@ -145,3 +148,6 @@ class Breakout(ImageGymEnv):
         self.state_size = [self.frame_stack_size * 1, 96, 96]
         self.actions_amount = 4
         self.initialize_frame_stack()
+    
+    def create_environment(self) -> gym.Env:
+        return AtariWrapper(gym.make(self.gym_name, render_mode=None))
