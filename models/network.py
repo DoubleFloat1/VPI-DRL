@@ -20,32 +20,22 @@ class ValueModel(nn.Module):
 		elif len(state_size) == 3:
 			height: int = state_size[1]
 			width: int = state_size[2]
-			for _ in range(4):
-				height = height // 2
-				width = width // 2
+			height = height // 4 - 1
+			width = width // 4 - 1
+			height = height // 2 - 1
+			width = width // 2 - 1
+			height = height - 2
+			width = width - 2
+
 			flatten_size: int = 64 * height * width
 
 			self.model = nn.Sequential(
-				nn.Conv2d(state_size[0], 8, 3, padding=1),
+				nn.Conv2d(state_size[0], 32, kernel_size=8, stride=4),
 				nn.ReLU(),
-				nn.Conv2d(8, 8, 3, padding=1),
+				nn.Conv2d(32, 64, kernel_size=4, stride=2),
 				nn.ReLU(),
-				nn.MaxPool2d(2, 2),
-				nn.Conv2d(8, 16, 3, padding=1),
+				nn.Conv2d(64, 64, kernel_size=3, stride=1),
 				nn.ReLU(),
-				nn.Conv2d(16, 16, 3, padding=1),
-				nn.ReLU(),
-				nn.MaxPool2d(2, 2),
-				nn.Conv2d(16, 32, 3, padding=1),
-				nn.ReLU(),
-				nn.Conv2d(32, 32, 3, padding=1),
-				nn.ReLU(),
-				nn.MaxPool2d(2, 2),
-				nn.Conv2d(32, 64, 3, padding=1),
-				nn.ReLU(),
-				nn.Conv2d(64, 64, 3, padding=1),
-				nn.ReLU(),
-				nn.MaxPool2d(2, 2),
 				nn.Flatten(start_dim=-3),
 				nn.Linear(flatten_size, 512),
 				nn.ReLU(),
@@ -345,32 +335,22 @@ class BayesValueModelUniform(BayesModelUniform):
 		else:
 			height: int = state_size[1]
 			width: int = state_size[2]
-			for _ in range(4):
-				height = height // 2
-				width = width // 2
+			height = height // 4 - 1
+			width = width // 4 - 1
+			height = height // 2 - 1
+			width = width // 2 - 1
+			height = height - 2
+			width = width - 2
+
 			flatten_size: int = 64 * height * width
 
 			self.range1 = nn.Sequential(
-				nn.Conv2d(state_size[0], 8, 3, padding=1),
+				nn.Conv2d(state_size[0], 32, kernel_size=8, stride=4),
 				nn.ReLU(),
-				nn.Conv2d(8, 8, 3, padding=1),
+				nn.Conv2d(32, 64, kernel_size=4, stride=2),
 				nn.ReLU(),
-				nn.MaxPool2d(2, 2),
-				nn.Conv2d(8, 16, 3, padding=1),
+				nn.Conv2d(64, 64, kernel_size=3, stride=1),
 				nn.ReLU(),
-				nn.Conv2d(16, 16, 3, padding=1),
-				nn.ReLU(),
-				nn.MaxPool2d(2, 2),
-				nn.Conv2d(16, 32, 3, padding=1),
-				nn.ReLU(),
-				nn.Conv2d(32, 32, 3, padding=1),
-				nn.ReLU(),
-				nn.MaxPool2d(2, 2),
-				nn.Conv2d(32, 64, 3, padding=1),
-				nn.ReLU(),
-				nn.Conv2d(64, 64, 3, padding=1),
-				nn.ReLU(),
-				nn.MaxPool2d(2, 2),
 				nn.Flatten(start_dim=-3),
 				nn.Linear(flatten_size, 512),
 				nn.ReLU(),
@@ -380,26 +360,12 @@ class BayesValueModelUniform(BayesModelUniform):
 			)
 
 			self.range2 = nn.Sequential(
-				nn.Conv2d(state_size[0], 8, 3, padding=1),
+				nn.Conv2d(state_size[0], 32, kernel_size=8, stride=4),
 				nn.ReLU(),
-				nn.Conv2d(8, 8, 3, padding=1),
+				nn.Conv2d(32, 64, kernel_size=4, stride=2),
 				nn.ReLU(),
-				nn.MaxPool2d(2, 2),
-				nn.Conv2d(8, 16, 3, padding=1),
+				nn.Conv2d(64, 64, kernel_size=3, stride=1),
 				nn.ReLU(),
-				nn.Conv2d(16, 16, 3, padding=1),
-				nn.ReLU(),
-				nn.MaxPool2d(2, 2),
-				nn.Conv2d(16, 32, 3, padding=1),
-				nn.ReLU(),
-				nn.Conv2d(32, 32, 3, padding=1),
-				nn.ReLU(),
-				nn.MaxPool2d(2, 2),
-				nn.Conv2d(32, 64, 3, padding=1),
-				nn.ReLU(),
-				nn.Conv2d(64, 64, 3, padding=1),
-				nn.ReLU(),
-				nn.MaxPool2d(2, 2),
 				nn.Flatten(start_dim=-3),
 				nn.Linear(flatten_size, 512),
 				nn.ReLU(),

@@ -1,4 +1,4 @@
-from models.VPIDQN import VPIDQN, TempVPIDQN2
+from models.VPIDQN import VPIDQN
 from models.DQN import DQN
 from models.rl_model import RLModel
 import gymnasium as gym
@@ -168,8 +168,10 @@ def main(gym_env: GymEnv, model: RLModel, data_file: str, create_new_data_file: 
 
         mean_reward_history = []
         rewards = test_manager.test_model(model, test_episode_amount)
-        print(sum(rewards) / len(rewards))
-        mean_reward_history.append(sum(rewards) / len(rewards))
+        mean_reward: float = sum(rewards) / len(rewards)
+        print(mean_reward)
+        mean_reward_history.append(mean_reward)
+        best_mean_reward: float = mean_reward
         for i in range(training_epochs):
             print(f"Trial {t} - Epoch {i}")
 
@@ -179,41 +181,49 @@ def main(gym_env: GymEnv, model: RLModel, data_file: str, create_new_data_file: 
             print(f"{end - start:.3f}s")
 
             rewards = test_manager.test_model(model, test_episode_amount)
-            print(sum(rewards) / len(rewards))
-            mean_reward_history.append(sum(rewards) / len(rewards))
+            mean_reward = sum(rewards) / len(rewards)
+            print(mean_reward)
+            mean_reward_history.append(mean_reward)
+            if mean_reward > best_mean_reward:
+                best_mean_reward = mean_reward
+                model.save()
 
         writer.add_trial_rewards(mean_reward_history)
         writer.write()
-        model = model.new()
+
+        if t < trials_amount - 1:
+            model = model.new()
 
 
 if __name__ == "__main__":
     gym_env = Breakout()
 
-    train_step_amount: int = 1000
+    train_step_amount: int = 80000
     training_epochs: int = 100
     test_episode_amount: int = 20
     trials_amount: int = 1
 
-    total_steps_of_eps_decay: int = round(0.5 * train_step_amount * training_epochs)
+    total_steps_of_eps_decay: int = round(0.125 * train_step_amount * training_epochs)
     dqn = DQN(gym_env.state_size, gym_env.actions_amount, 
-              experience_replay_max_size=100000,
+              experience_replay_max_size=750000,
               experience_replay_state_to_uint8=gym_env.image_state,
               updates_to_renew_target_network=10000,
               initial_eps=1.0,
               min_eps=0.1,
-              total_steps_of_eps_decay=total_steps_of_eps_decay
+              total_steps_of_eps_decay=total_steps_of_eps_decay,
+              load_model_path=None
               )
     
     #vpidqn = VPIDQN(gym_env.state_size, gym_env.actions_amount, 
-    #                experience_replay_max_size=8192,
+    #                experience_replay_max_size=750000,
     #                experience_replay_state_to_uint8=gym_env.image_state,
     #                updates_to_renew_target_network=10000,
     #                value_kl_weight=0.1,
     #                updates_to_pass_posterior=10000,
     #                initial_eps=1.0,
     #                min_eps=0.1,
-    #                total_steps_of_eps_decay=total_steps_of_eps_decay
+    #                total_steps_of_eps_decay=total_steps_of_eps_decay,
+    #                load_model_path=None
     #                )
 
     main(gym_env, dqn, "dqn.txt", train_step_amount=train_step_amount, training_epochs=training_epochs, test_episode_amount=test_episode_amount,trials_amount=trials_amount)

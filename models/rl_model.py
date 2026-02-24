@@ -27,4 +27,10 @@ class RLModel:
     
     def new(self) -> RLModel:
         raise NotImplementedError
+    
+    def save(self) -> None:
+        raise NotImplementedError
+    
+    def load(self, path: str) -> None:
+        raise NotImplementedError
         
