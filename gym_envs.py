@@ -36,7 +36,7 @@ class ImageGymEnv(GymEnv):
     def initialize_frame_stack(self) -> None:
         frame_size = self.state_size.copy()
         frame_size[0] = frame_size[0] // self.frame_stack_size
-        self.frames = [torch.zeros(frame_size) for _ in range(self.frame_stack_size)]
+        self.frames = [torch.zeros(frame_size, dtype=torch.uint8) for _ in range(self.frame_stack_size)]
         self.transformations: T.Compose = T.Compose([T.ToPILImage(), T.Grayscale(), T.Resize(self.state_size[1:]), T.ToTensor()])
     
     def add_frame(self, x) -> None:
@@ -51,8 +51,8 @@ class ImageGymEnv(GymEnv):
         self.initialize_frame_stack()
 
     def preprocess(self, x: ndarray):
-        x = self.transformations(x)
-        self.add_frame(x)
+        y: Tensor = self.transformations(x)
+        self.add_frame(y)
         return self.get_frame_stack()
 
 
