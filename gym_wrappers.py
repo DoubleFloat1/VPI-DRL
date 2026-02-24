@@ -230,7 +230,7 @@ class AtariWrapper(gym.Wrapper):
         env: gym.Env,
         noop_max: int = 30,
         frame_skip: int = 4,
-        screen_size: int = 96,
+        screen_size: int = 84,
         terminal_on_life_loss: bool = True,
         clip_reward: bool = True,
     ):

@@ -74,7 +74,7 @@ class MarioBros(ImageGymEnv):
     def __init__(self):
         super().__init__()
         self.gym_name = "ALE/MarioBros-v5"
-        self.state_size = [self.frame_stack_size * 1, 96, 96]
+        self.state_size = [self.frame_stack_size * 1, 84, 84]
         self.actions_amount = 18
         self.initialize_frame_stack()
     
@@ -98,7 +98,7 @@ class SpaceInvaders(ImageGymEnv):
     def __init__(self):
         super().__init__()
         self.gym_name = "ALE/SpaceInvaders-v5"
-        self.state_size = [self.frame_stack_size * 1, 96, 96]
+        self.state_size = [self.frame_stack_size * 1, 84, 84]
         self.actions_amount = 6
         self.initialize_frame_stack()
     
@@ -107,7 +107,7 @@ class CarRacing(ImageGymEnv):
     def __init__(self):
         super().__init__()
         self.gym_name = "CarRacing-v3"
-        self.state_size = [self.frame_stack_size * 1, 96, 96]
+        self.state_size = [self.frame_stack_size * 1, 84, 84]
         self.actions_amount = 5
         self.initialize_frame_stack()
     
@@ -145,7 +145,7 @@ class Breakout(ImageGymEnv):
     def __init__(self):
         super().__init__()
         self.gym_name = "ALE/Breakout-v5"
-        self.state_size = [self.frame_stack_size * 1, 96, 96]
+        self.state_size = [self.frame_stack_size * 1, 84, 84]
         self.actions_amount = 4
         self.initialize_frame_stack()
     
