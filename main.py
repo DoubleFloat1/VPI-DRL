@@ -41,27 +41,34 @@ class EnvironmentWrapper:
 
 # TODO: Frame stacking only works for 1 training environment
 class TrainManager:
-    def __init__(self, gym_env: GymEnv, envs_amount: int):
+    def __init__(self, gym_env: GymEnv):
         self.gym_env: GymEnv = gym_env
-        self.envs: List[EnvironmentWrapper] = [EnvironmentWrapper(gym_env.create_environment()) for _ in range(envs_amount)]
+        self.env: EnvironmentWrapper = EnvironmentWrapper(gym_env.create_environment())
+        self.preprocessed_state: Tensor = None
+        self.reset_environment()
     
+    def reset_environment(self) -> None:
+        self.env.reset()
+        self.gym_env.end_episode()
+        self.preprocessed_state = self.gym_env.preprocess(self.env.get_current_state())
+
     def train_model(self, model: VPIDQN, steps_amount: int) -> None:
         for t in range(steps_amount):
             print(f"Training: {100 * t / (steps_amount - 1):.2f}%", end="\r")
 
-            for env in self.envs:
-                state = env.get_current_state()
-                state = self.gym_env.preprocess(state)
-                action = model.get_next_action(state)
+            state = self.preprocessed_state
+            action = model.get_next_action(state)
 
-                next_state, reward, terminated, truncated = env.step(action)
-                next_state = self.gym_env.preprocess(next_state)
-                model.improve(state, action, reward, next_state, terminated)
+            next_state, reward, terminated, truncated = self.env.step(action)
+            next_state = self.gym_env.preprocess(next_state)
+            model.improve(state, action, reward, next_state, terminated)
 
-                if terminated or truncated:
-                    env.reset()
-                    self.gym_env.end_episode()
+            self.preprocessed_state = next_state
+
+            if terminated or truncated:
+                self.reset_environment()
         print()
+
 
 class TestManager:
     def __init__(self, gym_env: GymEnv):
@@ -74,15 +81,9 @@ class TestManager:
         episode_total_reward_list = []
 
         self.test_env.reset()
-        step_count = 0
         print(f"Testing: {episode_count} / {episodes_amount}", end="\r")
         while episode_count < episodes_amount:
-            step_count += 1
-            if step_count % 1000 == 0:
-                pass
-                #print(step_count)
             state = self.test_env.get_current_state()
-            #print(state)
             state = self.gym_env.preprocess(state)
             action = model.inference_next_action(state)
             _, reward, terminated, truncated = self.test_env.step(action)
@@ -126,7 +127,11 @@ class ResultWriter:
     def write(self) -> None:
         with open(self.file_name, 'w') as file:
             file.write(f"{self.train_step_amount}\n")
-            file.write(f"{len(self.trials_rewards)} {len(self.trials_rewards[0])}\n")
+            if len(self.trials_rewards) > 0:
+                file.write(f"{len(self.trials_rewards)} {len(self.trials_rewards[0])}\n")
+            else:
+                file.write("0 0\n")
+
             for rewards in self.trials_rewards:
                 string = self.list_to_str(rewards)
                 file.write(string + "\n")
@@ -162,8 +167,9 @@ class ResultWriter:
 def main(gym_env: GymEnv, model: RLModel, data_file: str, create_new_data_file: bool = True, training_epochs: int = 20,
          test_episode_amount: int = 100, train_step_amount: int = 2000, trials_amount: int = 10):
     writer = ResultWriter(data_file, gym_env, model, train_step_amount, create_new_data_file)
+    writer.write()
     for t in range(trials_amount):
-        train_manager: TrainManager = TrainManager(gym_env, 1)
+        train_manager: TrainManager = TrainManager(gym_env)
         test_manager: TestManager = TestManager(gym_env)
 
         mean_reward_history = []
@@ -208,6 +214,7 @@ if __name__ == "__main__":
               experience_replay_max_size=750000,
               experience_replay_state_to_uint8=gym_env.image_state,
               updates_to_renew_target_network=10000,
+              value_lr=1e-5,
               initial_eps=1.0,
               min_eps=0.1,
               total_steps_of_eps_decay=total_steps_of_eps_decay,

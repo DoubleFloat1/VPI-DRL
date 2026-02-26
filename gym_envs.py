@@ -14,7 +14,7 @@ class GymEnv:
         self.actions_amount: int = -1
         self.image_state: bool = False
 
-    def preprocess(self, x):
+    def preprocess(self, x: ndarray) -> Tensor:
         return torch.tensor(x, dtype=torch.float32)
     
     def end_episode(self) -> None:
@@ -37,7 +37,7 @@ class ImageGymEnv(GymEnv):
         frame_size = self.state_size.copy()
         frame_size[0] = frame_size[0] // self.frame_stack_size
         self.frames = [torch.zeros(frame_size, dtype=torch.uint8) for _ in range(self.frame_stack_size)]
-        self.transformations: T.Compose = T.Compose([T.ToPILImage(), T.Grayscale(), T.Resize(self.state_size[1:]), T.ToTensor()])
+        self.transformations: T.Compose = T.Compose([T.ToPILImage(), T.ToTensor()])
     
     def add_frame(self, x) -> None:
         for i in range(self.frame_stack_size - 1):
@@ -50,7 +50,7 @@ class ImageGymEnv(GymEnv):
     def end_episode(self):
         self.initialize_frame_stack()
 
-    def preprocess(self, x: ndarray):
+    def preprocess(self, x: ndarray) -> Tensor:
         y: Tensor = self.transformations(x)
         self.add_frame(y)
         return self.get_frame_stack()
