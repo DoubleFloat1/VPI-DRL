@@ -119,6 +119,23 @@ class ValueModelManager:
             self.target_network = copy.deepcopy(self.policy_network)
             self.update_count = 0
 
+    def get_expected_action_rewards(self, reward_tensor: Tensor, next_state_tensor: Tensor, episode_terminated_tensor: Tensor, use_ddqn: bool = True) -> Tensor:
+        with torch.no_grad():
+            if not use_ddqn:
+                predicted_next_rewards: Tensor = self.get_target_q_values(next_state_tensor)
+                predicted_next_max_reward: Tensor = predicted_next_rewards.max(dim=-1, keepdim=True)[0].detach()
+                expected_action_rewards: Tensor = reward_tensor + self.gamma * predicted_next_max_reward * (1 - episode_terminated_tensor)
+                return expected_action_rewards
+            
+            policy_next_state_rewards: Tensor = self.get_state_q_values(next_state_tensor)
+            policy_argmax_actions: Tensor = policy_next_state_rewards.argmax(dim=-1, keepdim=True)
+            target_next_state_rewards: Tensor = self.get_target_q_values(next_state_tensor)
+            predicted_next_max_reward: Tensor = target_next_state_rewards.gather(dim=-1, index=policy_argmax_actions)
+            expected_action_rewards: Tensor = reward_tensor + self.gamma * predicted_next_max_reward * (1 - episode_terminated_tensor)
+            return expected_action_rewards
+        
+
+
     def update_model(self) -> None:
         experience_tensors = self.experience_manager.get_batch()
 
@@ -131,10 +148,7 @@ class ValueModelManager:
         predicted_rewards: Tensor = self.get_state_q_values(state_tensor)
         predicted_action_rewards: Tensor = predicted_rewards.gather(dim=-1, index=action_tensor)
 
-        predicted_next_rewards: Tensor = self.get_target_q_values(next_state_tensor)
-        predicted_next_max_reward: Tensor = predicted_next_rewards.max(dim=-1, keepdim=True)[0].detach()
-
-        expected_action_rewards: Tensor = reward_tensor + self.gamma * predicted_next_max_reward * (1 - episode_terminated_tensor)
+        expected_action_rewards: Tensor = self.get_expected_action_rewards(reward_tensor, next_state_tensor, episode_terminated_tensor)
         loss: Tensor = self.loss_function(predicted_action_rewards, expected_action_rewards) + self.model_loss()
 
         self.optimizer.zero_grad()
@@ -145,7 +159,6 @@ class ValueModelManager:
         self.post_update()
 
 
-# TODO: make eps variable with respect to time step
 class DQN(RLModel):
     def __init__(self, state_size: List[int], actions_amount: int, gamma: float = 0.99, value_lr: float = 3e-4, value_batch_size: int = 32,
                  experience_replay_max_size: int = 4096, experience_replay_state_to_uint8: bool = False, updates_to_renew_target_network: int = 256, 

@@ -1,3 +1,4 @@
+import copy
 from models.VPIDQN import VPIDQN
 from models.DQN import DQN
 from models.rl_model import RLModel
@@ -54,7 +55,7 @@ class TrainManager:
 
     def train_model(self, model: VPIDQN, steps_amount: int) -> None:
         for t in range(steps_amount):
-            print(f"Training: {100 * t / (steps_amount - 1):.2f}%", end="\r")
+            print(f"\rTraining: {100 * t / (steps_amount - 1):.2f}%", end="")
 
             state = self.preprocessed_state
             action = model.get_next_action(state)
@@ -81,7 +82,7 @@ class TestManager:
         episode_total_reward_list = []
 
         self.test_env.reset()
-        print(f"Testing: {episode_count} / {episodes_amount}", end="\r")
+        print(f"\rTesting: {episode_count} / {episodes_amount}", end="")
         while episode_count < episodes_amount:
             state = self.test_env.get_current_state()
             state = self.gym_env.preprocess(state)
@@ -92,7 +93,7 @@ class TestManager:
                 episode_total_reward_list.append(episode_total_reward)
                 episode_total_reward = 0.0
                 episode_count += 1
-                print(f"Testing: {episode_count} / {episodes_amount}", end="\r")
+                print(f"\rTesting: {episode_count} / {episodes_amount}", end="")
                 self.test_env.reset()
                 self.gym_env.end_episode()
         
@@ -163,14 +164,13 @@ class ResultWriter:
         return string
 
 
-
 def main(gym_env: GymEnv, model: RLModel, data_file: str, create_new_data_file: bool = True, training_epochs: int = 20,
          test_episode_amount: int = 100, train_step_amount: int = 2000, trials_amount: int = 10):
     writer = ResultWriter(data_file, gym_env, model, train_step_amount, create_new_data_file)
     writer.write()
     for t in range(trials_amount):
-        train_manager: TrainManager = TrainManager(gym_env)
-        test_manager: TestManager = TestManager(gym_env)
+        train_manager: TrainManager = TrainManager(copy.deepcopy(gym_env))
+        test_manager: TestManager = TestManager(copy.deepcopy(gym_env))
 
         mean_reward_history = []
         rewards = test_manager.test_model(model, test_episode_amount)
@@ -204,16 +204,16 @@ def main(gym_env: GymEnv, model: RLModel, data_file: str, create_new_data_file: 
 if __name__ == "__main__":
     gym_env = Breakout()
 
-    train_step_amount: int = 80000
+    train_step_amount: int = 800
     training_epochs: int = 100
     test_episode_amount: int = 20
     trials_amount: int = 1
 
     total_steps_of_eps_decay: int = round(0.125 * train_step_amount * training_epochs)
     dqn = DQN(gym_env.state_size, gym_env.actions_amount, 
-              experience_replay_max_size=750000,
+              experience_replay_max_size=7500,
               experience_replay_state_to_uint8=gym_env.image_state,
-              updates_to_renew_target_network=10000,
+              updates_to_renew_target_network=2500,
               value_lr=1e-5,
               initial_eps=1.0,
               min_eps=0.1,

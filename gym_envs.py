@@ -150,4 +150,4 @@ class Breakout(ImageGymEnv):
         self.initialize_frame_stack()
     
     def create_environment(self) -> gym.Env:
-        return AtariWrapper(gym.make(self.gym_name, render_mode=None))
+        return AtariWrapper(gym.make(self.gym_name, render_mode=None), noop_max=10, frame_skip=1)
