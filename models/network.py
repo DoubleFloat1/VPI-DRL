@@ -114,11 +114,11 @@ class BayesLinear(nn.Module):
 			self.prior_bias_log_sigma = self.prior_bias_log_sigma.to(device)
 
 	def pass_posterior_to_prior(self) -> None:
-		self.prior_weight_mu = self.weight_mu.clone().detach()
-		self.prior_weight_log_sigma = self.weight_log_sigma.clone().detach()
+		self.prior_weight_mu = self.weight_mu.detach().clone()
+		self.prior_weight_log_sigma = self.weight_log_sigma.detach().clone()
 		if self.bias:
-			self.prior_bias_mu = self.bias_mu.clone().detach()
-			self.prior_bias_log_sigma = self.bias_log_sigma.clone().detach()
+			self.prior_bias_mu = self.bias_mu.detach().clone()
+			self.prior_bias_log_sigma = self.bias_log_sigma.detach().clone()
 
 	def forward(self, input):
 		if self.weight_eps is None:
@@ -136,155 +136,15 @@ class BayesLinear(nn.Module):
             
 		return F.linear(input, weight, bias)
 
+
+
 class BayesModel(nn.Module):
 	def __init__(self):
 		super().__init__()
-		self.mu_model = None
-		self.log_sigma_model = None
-		self.range_min: float = 0.0
-		self.range_max: float = 1.0
-		self.loss: nn.MSELoss = nn.MSELoss()
-		# TODO: Is there a way to make a loss function take more into account the variance of the data?
-		# Works well for small variance. It may be best to assume we know a upper and lower bound to normalize the data to [0, 1] range
-		# It seems necessary to use the pass_posterior_to_prior function every once in a while
-	
-	def pre_process(self, x: Tensor) -> Tensor:
-		return (x - self.range_min) / (self.range_max - self.range_min)
-	
-	def post_process(self, x: Tensor) -> Tensor:
-		return (x * (self.range_max - self.range_min)) + self.range_min
-	
-	def forward(self, x: Tensor) -> Tensor:
-		mu = self.mu_model(x)
-		log_sigma = self.log_sigma_model(x)
-		y: Tensor = self.reparameterize(mu, log_sigma)
-		y = self.post_process(y)
-		return y, mu, torch.exp(log_sigma)
-	
-	def reparameterize(self, mu: Tensor, log_sigma: Tensor) -> Tensor:
-		return mu + torch.exp(log_sigma) * torch.randn_like(log_sigma)
-	
-	def reconstruction_loss(self, output: Tensor, expected_output: Tensor) -> Tensor:
-		normalized_output: Tensor = self.pre_process(output)
-		normalized_expected_output: Tensor = self.pre_process(expected_output)
-		return self.loss(normalized_output, normalized_expected_output)
-
-	
-	def kl_loss(self) -> Tensor:
-		kl_sum: Tensor = 0.0
-		n: int = 0
-		for m in self.modules():
-			if isinstance(m, BayesLinear):
-				kl_sum += m.kl_loss()
-				n += m.distributions_amount()
-		
-		kl_sum = kl_sum.squeeze()
-		return kl_sum / n
-	
-	def prior_to_device(self, device: torch.device) -> None:
-		for m in self.modules():
-			if isinstance(m, BayesLinear):
-				m.prior_to_device(device)
-
-	def pass_posterior_to_prior(self) -> None:
-		for m in self.modules():
-			if isinstance(m, BayesLinear):
-				m.pass_posterior_to_prior()
-
-class BayesTransitionModel(BayesModel):
-	def __init__(self, in_features: int, out_features: int):
-		super().__init__()
-		self.mu_model = nn.Sequential(
-			nn.Linear(in_features, 64),
-			nn.ReLU(),
-			nn.Linear(64, 64),
-			nn.ReLU(),
-			#nn.Linear(64, out_features)
-			BayesLinear(64, out_features, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
-		)
-
-		self.log_sigma_model = nn.Sequential(
-			nn.Linear(in_features, 64),
-			nn.ReLU(),
-			nn.Linear(64, 64),
-			nn.ReLU(),
-			#nn.Linear(64, out_features)
-			BayesLinear(64, out_features, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
-		)
-
-		self.range_min: float = 0.0
-		self.range_max: float = 1.0
-		self.loss: nn.MSELoss = nn.MSELoss()
-
-class BayesValueModel(BayesModel):
-	def __init__(self, in_features: int, out_features: int):
-		super().__init__()
-		self.mu_model = nn.Sequential(
-			nn.Linear(in_features, 64),
-			nn.ReLU(),
-			nn.Linear(64, 64),
-			nn.ReLU(),
-			#nn.Linear(64, out_features)
-			BayesLinear(64, out_features, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
-		)
-
-		self.log_sigma_model = nn.Sequential(
-			nn.Linear(in_features, 64),
-			nn.ReLU(),
-			nn.Linear(64, 64),
-			nn.ReLU(),
-			#nn.Linear(64, out_features)
-			BayesLinear(64, out_features, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
-		)
-
-		self.range_min: float = 0.0
-		self.range_max: float = 1.0
-		self.loss: nn.MSELoss = nn.MSELoss()
-
-
-
-
-
-
-
-
-
-
-# EXPERIMENTAL MODULES
-class BayesModelUniform(nn.Module):
-	def __init__(self):
-		super().__init__()
-		self.range1 = None
-		self.range2 = None
-		self.range_min: float = 0.0
-		self.range_max: float = 1.0
-		self.loss: nn.MSELoss = nn.MSELoss()
 		self.device: torch.device = "cpu"
-		# TODO: Is there a way to make a loss function take more into account the variance of the data?
-		# Works well for small variance. It may be best to assume we know a upper and lower bound to normalize the data to [0, 1] range
-		# It seems necessary to use the pass_posterior_to_prior function every once in a while
-	
-	def pre_process(self, x: Tensor) -> Tensor:
-		return (x - self.range_min) / (self.range_max - self.range_min)
-	
-	def post_process(self, x: Tensor) -> Tensor:
-		return (x * (self.range_max - self.range_min)) + self.range_min
-	
-	def forward(self, x: Tensor) -> Tensor:
-		r1 = self.range1(x)
-		r2 = self.range2(x)
-		y: Tensor = self.reparameterize(r1, r2)
-		y = self.post_process(y)
-		return y, r1, r2
-	
-	def reparameterize(self, r1: Tensor, r2: Tensor) -> Tensor:
-		return torch.rand_like(r1) * (r2 - r1) + r1
-	
-	def reconstruction_loss(self, output: Tensor, expected_output: Tensor) -> Tensor:
-		normalized_output: Tensor = self.pre_process(output)
-		normalized_expected_output: Tensor = self.pre_process(expected_output)
-		return self.loss(normalized_output, normalized_expected_output)
 
+	def forward(self, x: Tensor) -> Tensor:
+		raise NotImplementedError
 	
 	def kl_loss(self) -> Tensor:
 		kl_sum: Tensor = torch.tensor([0.0], dtype=torch.float32).to(self.device)
@@ -307,6 +167,106 @@ class BayesModelUniform(nn.Module):
 		for m in self.modules():
 			if isinstance(m, BayesLinear):
 				m.pass_posterior_to_prior()
+
+class BayesModelNormal(BayesModel):
+	def __init__(self):
+		super().__init__()
+		self.mu_model = None
+		self.log_sigma_model = None
+		# TODO: Is there a way to make a loss function take more into account the variance of the data?
+		# Works well for small variance. It may be best to assume we know a upper and lower bound to normalize the data to [0, 1] range
+		# It seems necessary to use the pass_posterior_to_prior function every once in a while
+
+	def forward(self, x: Tensor) -> Tensor:
+		mu = self.mu_model(x)
+		log_sigma = self.log_sigma_model(x)
+		y: Tensor = self.reparameterize(mu, log_sigma)
+		return y, mu, torch.exp(log_sigma)
+	
+	def reparameterize(self, mu: Tensor, log_sigma: Tensor) -> Tensor:
+		return mu + torch.exp(log_sigma) * torch.randn_like(log_sigma)
+
+
+class BayesValueModelNormal(BayesModelNormal):
+	def __init__(self, state_size: List[int], actions_amount: int):
+		super().__init__()
+
+		if len(state_size) == 1:
+			self.mu_model = nn.Sequential(
+				nn.Linear(state_size[0], 512),
+				nn.ReLU(),
+				nn.Linear(512, 512),
+				nn.ReLU(),
+				#nn.Linear(64, out_features)
+				BayesLinear(512, actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
+			)
+
+			self.log_sigma_model = nn.Sequential(
+				nn.Linear(state_size[0], 512),
+				nn.ReLU(),
+				nn.Linear(512, 512),
+				nn.ReLU(),
+				#nn.Linear(64, out_features)
+				BayesLinear(512, actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
+			)
+		else:
+			height: int = state_size[1]
+			width: int = state_size[2]
+			height = height // 4 - 1
+			width = width // 4 - 1
+			height = height // 2 - 1
+			width = width // 2 - 1
+			height = height - 2
+			width = width - 2
+
+			flatten_size: int = 64 * height * width
+
+			self.mu_model = nn.Sequential(
+				nn.Conv2d(state_size[0], 32, kernel_size=8, stride=4),
+				nn.ReLU(),
+				nn.Conv2d(32, 64, kernel_size=4, stride=2),
+				nn.ReLU(),
+				nn.Conv2d(64, 64, kernel_size=3, stride=1),
+				nn.ReLU(),
+				nn.Flatten(start_dim=-3),
+				nn.Linear(flatten_size, 512),
+				nn.ReLU(),
+				nn.Linear(512, 512),
+				nn.ReLU(),
+				BayesLinear(512, actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
+			)
+
+			self.log_sigma_model = nn.Sequential(
+				nn.Conv2d(state_size[0], 32, kernel_size=8, stride=4),
+				nn.ReLU(),
+				nn.Conv2d(32, 64, kernel_size=4, stride=2),
+				nn.ReLU(),
+				nn.Conv2d(64, 64, kernel_size=3, stride=1),
+				nn.ReLU(),
+				nn.Flatten(start_dim=-3),
+				nn.Linear(flatten_size, 512),
+				nn.ReLU(),
+				nn.Linear(512, 512),
+				nn.ReLU(),
+				BayesLinear(512, actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
+			)
+
+
+
+class BayesModelUniform(BayesModel):
+	def __init__(self):
+		super().__init__()
+		self.range1 = None
+		self.range2 = None
+	
+	def forward(self, x: Tensor) -> Tensor:
+		r1 = self.range1(x)
+		r2 = self.range2(x)
+		y: Tensor = self.reparameterize(r1, r2)
+		return y, r1, r2
+	
+	def reparameterize(self, r1: Tensor, r2: Tensor) -> Tensor:
+		return torch.rand_like(r1) * (r2 - r1) + r1
 
 
 
@@ -374,6 +334,74 @@ class BayesValueModelUniform(BayesModelUniform):
 				BayesLinear(512, actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
 			)
 
-		self.range_min: float = 0.0
-		self.range_max: float = 1.0
-		self.loss: nn.MSELoss = nn.MSELoss()
+
+
+
+
+
+
+
+
+
+
+# EXPERIMENTAL MODELS
+class BayesModelNormal2(BayesModel):
+	def __init__(self):
+		super().__init__()
+		self.mu_log_sigma_model = None
+		# TODO: Is there a way to make a loss function take more into account the variance of the data?
+		# Works well for small variance. It may be best to assume we know a upper and lower bound to normalize the data to [0, 1] range
+		# It seems necessary to use the pass_posterior_to_prior function every once in a while
+
+	def forward(self, x: Tensor) -> Tensor:
+		mu_log_sigma: Tensor
+		mu_log_sigma = self.mu_log_sigma_model(x)
+		actions_amount = mu_log_sigma.shape[-1] // 2
+
+		mu, log_sigma = torch.split(mu_log_sigma, actions_amount, dim=-1)
+		y: Tensor = self.reparameterize(mu, log_sigma)
+		return y, mu, torch.exp(log_sigma)
+	
+	def reparameterize(self, mu: Tensor, log_sigma: Tensor) -> Tensor:
+		return mu + torch.exp(log_sigma) * torch.randn_like(log_sigma)
+
+
+class BayesValueModelNormal2(BayesModelNormal2):
+	def __init__(self, state_size: List[int], actions_amount: int):
+		super().__init__()
+
+		if len(state_size) == 1:
+			self.mu_log_sigma_model = nn.Sequential(
+				nn.Linear(state_size[0], 512),
+				nn.ReLU(),
+				nn.Linear(512, 512),
+				nn.ReLU(),
+				#nn.Linear(64, out_features)
+				BayesLinear(512, 2 * actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
+			)
+		else:
+			height: int = state_size[1]
+			width: int = state_size[2]
+			height = height // 4 - 1
+			width = width // 4 - 1
+			height = height // 2 - 1
+			width = width // 2 - 1
+			height = height - 2
+			width = width - 2
+
+			flatten_size: int = 64 * height * width
+
+			self.mu_log_sigma_model = nn.Sequential(
+				nn.Conv2d(state_size[0], 32, kernel_size=8, stride=4),
+				nn.ReLU(),
+				nn.Conv2d(32, 64, kernel_size=4, stride=2),
+				nn.ReLU(),
+				nn.Conv2d(64, 64, kernel_size=3, stride=1),
+				nn.ReLU(),
+				nn.Flatten(start_dim=-3),
+				nn.Linear(flatten_size, 512),
+				nn.ReLU(),
+				nn.Linear(512, 512),
+				nn.ReLU(),
+				BayesLinear(512, 2 * actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
+			)
