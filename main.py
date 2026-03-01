@@ -202,7 +202,7 @@ def main(gym_env: GymEnv, model: RLModel, data_file: str, create_new_data_file: 
 
 
 if __name__ == "__main__":
-    gym_env = Breakout()
+    gym_env = SpaceInvaders(noop_max=5, frame_skip=2)
 
     train_step_amount: int = 80000
     training_epochs: int = 100
@@ -210,16 +210,19 @@ if __name__ == "__main__":
     trials_amount: int = 1
 
     total_steps_of_eps_decay: int = round(0.125 * train_step_amount * training_epochs)
-    #dqn = DQN(gym_env.state_size, gym_env.actions_amount, 
-    #          experience_replay_max_size=750000,
-    #          experience_replay_state_to_uint8=gym_env.image_state,
-    #          updates_to_renew_target_network=2500,
-    #          value_lr=1e-5,
-    #          initial_eps=1.0,
-    #          min_eps=0.1,
-    #          total_steps_of_eps_decay=total_steps_of_eps_decay,
-    #          load_model_path=None
-    #          )
+
+    '''
+    dqn = DQN(gym_env.state_size, gym_env.actions_amount, 
+              experience_replay_max_size=750000,
+              experience_replay_state_to_uint8=gym_env.image_state,
+              updates_to_renew_target_network=2500,
+              value_lr=1e-5,
+              initial_eps=1.0,
+              min_eps=0.1,
+              total_steps_of_eps_decay=total_steps_of_eps_decay,
+              load_model_path=None
+              )
+    '''
     
     vpidqn = VPIDQN(gym_env.state_size, gym_env.actions_amount, 
                     experience_replay_max_size=750000,
@@ -234,6 +237,7 @@ if __name__ == "__main__":
                     use_uniform_distribution=False,
                     load_model_path=None
                     )
+    
 
     #main(gym_env, dqn, "dqn.txt", train_step_amount=train_step_amount, training_epochs=training_epochs, test_episode_amount=test_episode_amount,trials_amount=trials_amount)
     main(gym_env, vpidqn, "vpidqn.txt", train_step_amount=train_step_amount, training_epochs=training_epochs, test_episode_amount=test_episode_amount,trials_amount=trials_amount)

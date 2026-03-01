@@ -93,15 +93,7 @@ class Highway(GymEnv):
     
     def preprocess(self, x: ndarray):
         return x.flatten()
-    
-class SpaceInvaders(ImageGymEnv):
-    def __init__(self):
-        super().__init__()
-        self.gym_name = "ALE/SpaceInvaders-v5"
-        self.state_size = [self.frame_stack_size * 1, 84, 84]
-        self.actions_amount = 6
-        self.initialize_frame_stack()
-    
+
 
 class CarRacing(ImageGymEnv):
     def __init__(self):
@@ -139,15 +131,46 @@ class RaceTrack(GymEnv):
 
     def create_environment(self):
         return gym.make(self.gym_name, render_mode=None, track_index=self.track_index)
-    
 
-class Breakout(ImageGymEnv):
-    def __init__(self):
+
+
+class AtariEnv(ImageGymEnv):
+    def __init__(self, gym_name: str, actions_amount: int, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84):
         super().__init__()
-        self.gym_name = "ALE/Breakout-v5"
-        self.state_size = [self.frame_stack_size * 1, 84, 84]
-        self.actions_amount = 4
+        self.gym_name = gym_name
+        self.state_size = [self.frame_stack_size * 1, screen_size, screen_size]
+        self.actions_amount = actions_amount
+        self.noop_max: int = noop_max
+        self.frame_skip: int = frame_skip
+        self.screen_size: int = screen_size
+
         self.initialize_frame_stack()
     
     def create_environment(self) -> gym.Env:
-        return AtariWrapper(gym.make(self.gym_name, render_mode=None), noop_max=10, frame_skip=1)
+        return AtariWrapper(gym.make(self.gym_name, render_mode=None), 
+                            noop_max=self.noop_max, 
+                            frame_skip=self.frame_skip,
+                            screen_size=self.screen_size)
+    
+    def get_params_dict(self) -> Dict[str, Any]:
+        return {"gym_id": self.gym_name, "noop_max": self.noop_max, "frame_skip": self.frame_skip, "screen_size": self.screen_size}
+
+
+
+class SpaceInvaders(AtariEnv):
+    def __init__(self, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84):
+        super().__init__("ALE/SpaceInvaders-v5", 6, noop_max, frame_skip, screen_size)
+        
+
+class Breakout(AtariEnv):
+    def __init__(self, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84):
+        super().__init__("ALE/Breakout-v5", 4, noop_max, frame_skip, screen_size)
+    
+
+class Asteroid(AtariEnv):
+    def __init__(self, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84):
+        super().__init__("ALE/Asteroids-v5", 14, noop_max, frame_skip, screen_size)
+
+class Asterisk(AtariEnv):
+    def __init__(self, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84):
+        super().__init__("ALE/Asterix-v5", 9, noop_max, frame_skip, screen_size)
