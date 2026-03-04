@@ -202,9 +202,10 @@ def main(gym_env: GymEnv, model: RLModel, data_file: str, create_new_data_file: 
 
 
 if __name__ == "__main__":
-    gym_env = SpaceInvaders(noop_max=5, frame_skip=2)
+    #gym_env = SpaceInvaders(noop_max=5, frame_skip=2)
+    gym_env = LunarLander()
 
-    train_step_amount: int = 80000
+    train_step_amount: int = 800
     training_epochs: int = 100
     test_episode_amount: int = 100
     trials_amount: int = 1
@@ -216,7 +217,7 @@ if __name__ == "__main__":
               experience_replay_max_size=750000,
               experience_replay_state_to_uint8=gym_env.image_state,
               updates_to_renew_target_network=2500,
-              value_lr=1e-5,
+              value_lr=1e-4,
               initial_eps=1.0,
               min_eps=0.1,
               total_steps_of_eps_decay=total_steps_of_eps_decay,
@@ -225,9 +226,9 @@ if __name__ == "__main__":
     '''
     
     vpidqn = VPIDQN(gym_env.state_size, gym_env.actions_amount, 
-                    experience_replay_max_size=750000,
+                    experience_replay_max_size=7500,
                     experience_replay_state_to_uint8=gym_env.image_state,
-                    value_lr=1e-5,
+                    value_lr=3e-4,
                     updates_to_renew_target_network=2500,
                     value_kl_weight=0.1,
                     updates_to_pass_posterior=2500,
@@ -235,6 +236,8 @@ if __name__ == "__main__":
                     min_eps=0.1,
                     total_steps_of_eps_decay=total_steps_of_eps_decay,
                     use_uniform_distribution=False,
+                    alpha=0.7,
+                    beta=1.0,
                     load_model_path=None
                     )
     

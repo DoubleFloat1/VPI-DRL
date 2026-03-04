@@ -168,89 +168,6 @@ class BayesModel(nn.Module):
 			if isinstance(m, BayesLinear):
 				m.pass_posterior_to_prior()
 
-class BayesModelNormal(BayesModel):
-	def __init__(self):
-		super().__init__()
-		self.mu_model = None
-		self.log_sigma_model = None
-		# TODO: Is there a way to make a loss function take more into account the variance of the data?
-		# Works well for small variance. It may be best to assume we know a upper and lower bound to normalize the data to [0, 1] range
-		# It seems necessary to use the pass_posterior_to_prior function every once in a while
-
-	def forward(self, x: Tensor) -> Tensor:
-		mu = self.mu_model(x)
-		log_sigma = self.log_sigma_model(x)
-		y: Tensor = self.reparameterize(mu, log_sigma)
-		return y, mu, torch.exp(log_sigma)
-	
-	def reparameterize(self, mu: Tensor, log_sigma: Tensor) -> Tensor:
-		return mu + torch.exp(log_sigma) * torch.randn_like(log_sigma)
-
-
-class BayesValueModelNormal(BayesModelNormal):
-	def __init__(self, state_size: List[int], actions_amount: int):
-		super().__init__()
-
-		if len(state_size) == 1:
-			self.mu_model = nn.Sequential(
-				nn.Linear(state_size[0], 512),
-				nn.ReLU(),
-				nn.Linear(512, 512),
-				nn.ReLU(),
-				#nn.Linear(64, out_features)
-				BayesLinear(512, actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
-			)
-
-			self.log_sigma_model = nn.Sequential(
-				nn.Linear(state_size[0], 512),
-				nn.ReLU(),
-				nn.Linear(512, 512),
-				nn.ReLU(),
-				#nn.Linear(64, out_features)
-				BayesLinear(512, actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
-			)
-		else:
-			height: int = state_size[1]
-			width: int = state_size[2]
-			height = height // 4 - 1
-			width = width // 4 - 1
-			height = height // 2 - 1
-			width = width // 2 - 1
-			height = height - 2
-			width = width - 2
-
-			flatten_size: int = 64 * height * width
-
-			self.mu_model = nn.Sequential(
-				nn.Conv2d(state_size[0], 32, kernel_size=8, stride=4),
-				nn.ReLU(),
-				nn.Conv2d(32, 64, kernel_size=4, stride=2),
-				nn.ReLU(),
-				nn.Conv2d(64, 64, kernel_size=3, stride=1),
-				nn.ReLU(),
-				nn.Flatten(start_dim=-3),
-				nn.Linear(flatten_size, 512),
-				nn.ReLU(),
-				nn.Linear(512, 512),
-				nn.ReLU(),
-				BayesLinear(512, actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
-			)
-
-			self.log_sigma_model = nn.Sequential(
-				nn.Conv2d(state_size[0], 32, kernel_size=8, stride=4),
-				nn.ReLU(),
-				nn.Conv2d(32, 64, kernel_size=4, stride=2),
-				nn.ReLU(),
-				nn.Conv2d(64, 64, kernel_size=3, stride=1),
-				nn.ReLU(),
-				nn.Flatten(start_dim=-3),
-				nn.Linear(flatten_size, 512),
-				nn.ReLU(),
-				nn.Linear(512, 512),
-				nn.ReLU(),
-				BayesLinear(512, actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
-			)
-
 
 
 class BayesModelUniform(BayesModel):
@@ -337,15 +254,7 @@ class BayesValueModelUniform(BayesModelUniform):
 
 
 
-
-
-
-
-
-
-
-# EXPERIMENTAL MODELS
-class BayesModelNormal2(BayesModel):
+class BayesModelNormal(BayesModel):
 	def __init__(self):
 		super().__init__()
 		self.mu_log_sigma_model = None
@@ -366,7 +275,7 @@ class BayesModelNormal2(BayesModel):
 		return mu + torch.exp(log_sigma) * torch.randn_like(log_sigma)
 
 
-class BayesValueModelNormal2(BayesModelNormal2):
+class BayesValueModelNormal(BayesModelNormal):
 	def __init__(self, state_size: List[int], actions_amount: int):
 		super().__init__()
 

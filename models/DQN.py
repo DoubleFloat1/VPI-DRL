@@ -7,68 +7,9 @@ from typing import List, Tuple, Dict
 from torch.optim import Optimizer, Adam
 import numpy as np
 from models.rl_model import RLModel
+from models.experience_replay import ExperienceManagerInterface, ExperienceManager
 import copy
 
-class ExperienceManager:
-    def __init__(self, max_size: int, batch_size: int, state_size: List[int], state_to_uint8: bool, device: torch.device):
-        self.device: torch.device = device
-        self.state_size: List[int] = state_size
-        self.max_size: int = max_size
-        self.batch_size: int = batch_size
-
-        self.state_batch_dimensions: List[int] = [max_size] + state_size
-        self.state_dtype: torch.dtype = torch.uint8 if state_to_uint8 else torch.float32
-
-        self.state_batch: Tensor = torch.zeros(self.state_batch_dimensions, dtype=self.state_dtype).to(device)
-        self.action_batch: Tensor = torch.zeros(max_size, 1, dtype=torch.int32).to(device)
-        self.reward_batch: Tensor = torch.zeros(max_size, 1, dtype=torch.float32).to(device)
-        self.next_state_batch: Tensor = torch.zeros(self.state_batch_dimensions, dtype=self.state_dtype).to(device)
-        self.episode_terminated_batch: Tensor = torch.zeros(max_size, 1, dtype=torch.uint8).to(device)
-        
-        self.current_size: int = 0
-        self.next_index: int = 0
-
-    def add_experience(self, state: Tensor, action: int, reward: float, next_state: Tensor, episode_terminated: bool) -> None:
-        if self.state_dtype == torch.uint8:
-            state = state.detach().clone().mul(255.0).to(torch.uint8)
-            next_state = next_state.detach().clone().mul(255.0).to(torch.uint8)
-
-        self.state_batch[self.next_index] = state.to(self.device)
-        self.action_batch[self.next_index] = torch.tensor([action], dtype=torch.long).to(self.device)
-        self.reward_batch[self.next_index] = torch.tensor([reward], dtype=torch.float32).to(self.device)
-        self.next_state_batch[self.next_index] = next_state.to(self.device)
-        self.episode_terminated_batch[self.next_index] = torch.tensor([episode_terminated], dtype=torch.float32).to(self.device)
-
-        if self.current_size < self.max_size:
-            self.current_size += 1
-        self.next_index = (self.next_index + 1) % self.max_size
-    
-    def can_get_batch(self) -> bool:
-        return self.current_size >= self.batch_size
-    
-    def get_batch(self) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
-        indexes: Tensor = torch.tensor(np.random.randint(0, self.current_size, self.batch_size), dtype=torch.int32).to(self.device)
-        s: Tensor = self.state_batch[indexes]
-        a: Tensor = self.action_batch[indexes]
-        r: Tensor = self.reward_batch[indexes]
-        ns: Tensor = self.next_state_batch[indexes]
-        et: Tensor = self.episode_terminated_batch[indexes]
-
-        if self.state_dtype == torch.uint8:
-            s = s.detach().clone().float().div(255.0)
-            ns = ns.detach().clone().float().div(255.0)
-
-        return (s, a, r, ns, et)
-
-    def empty_experience(self) -> None:
-        self.state_batch = torch.zeros(self.state_batch_dimensions, dtype=self.state_dtype).to(self.device)
-        self.action_batch = torch.zeros(self.max_size, 1, dtype=torch.int32).to(self.device)
-        self.reward_batch = torch.zeros(self.max_size, 1, dtype=torch.float32).to(self.device)
-        self.next_state_batch = torch.zeros(self.state_batch_dimensions, dtype=self.state_dtype).to(self.device)
-        self.episode_terminated_batch = torch.zeros(self.max_size, 1, dtype=torch.uint8).to(self.device)
-        
-        self.current_size = 0
-        self.next_index = 0
 
     
 # TODO: implement n-step return
@@ -80,20 +21,16 @@ class ValueModelManager:
         self.device: torch.device = device
         self.gamma: float = gamma
 
-        self.policy_network: ValueModel
-        self.target_network: ValueModel
-        self.initialize_models()
+        self.policy_network: ValueModel = ValueModel(self.state_size, self.actions_amount).to(self.device)
+        self.target_network: ValueModel = copy.deepcopy(self.policy_network)
 
         self.optimizer: Optimizer = Adam(self.policy_network.parameters(), lr=learning_rate)
         self.loss_function: torch.nn.MSELoss = torch.nn.HuberLoss()
 
-        self.experience_manager: ExperienceManager = ExperienceManager(experience_replay_max_size, batch_size, state_size, experience_replay_state_to_uint8, device)
+        self.experience_manager: ExperienceManagerInterface = ExperienceManager(experience_replay_max_size, batch_size, state_size, 
+                                                                                experience_replay_state_to_uint8, device)
         self.updates_to_renew_target_network: int = updates_to_renew_target_network
         self.update_count: int = 0
-
-    def initialize_models(self) -> None:
-        self.policy_network = ValueModel(self.state_size, self.actions_amount).to(self.device)
-        self.target_network = copy.deepcopy(self.policy_network)
 
     def get_state_q_values(self, state: Tensor) -> Tensor:
         return self.policy_network(state)
@@ -110,9 +47,6 @@ class ValueModelManager:
         self.experience_manager.add_experience(state, action, reward, next_state, episode_terminated)
         if self.experience_manager.can_get_batch():
             self.update_model()
-    
-    def model_loss(self) -> Tensor:
-        return 0.0
     
     def post_update(self) -> None:
         if self.update_count >= self.updates_to_renew_target_network:
@@ -149,14 +83,16 @@ class ValueModelManager:
         predicted_action_rewards: Tensor = predicted_rewards.gather(dim=-1, index=action_tensor)
 
         expected_action_rewards: Tensor = self.get_expected_action_rewards(reward_tensor, next_state_tensor, episode_terminated_tensor)
-        loss: Tensor = self.loss_function(predicted_action_rewards, expected_action_rewards) + self.model_loss()
+        loss: Tensor = self.loss_function(predicted_action_rewards, expected_action_rewards)
 
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 
         self.update_count += 1
-        self.post_update()
+        if self.update_count >= self.updates_to_renew_target_network:
+            self.target_network = copy.deepcopy(self.policy_network)
+            self.update_count = 0
 
 
 class DQN(RLModel):

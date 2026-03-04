@@ -2,164 +2,18 @@ from __future__ import annotations
 
 import torch
 from torch import Tensor
-from models.network import BayesValueModelNormal, BayesValueModelUniform, BayesModel, BayesValueModelNormal2
 from typing import List, Tuple, Dict
 from torch.optim import Optimizer, Adam
 import numpy as np
 from models.rl_model import RLModel
-import copy
-from models.DQN import DQN, ValueModelManager, ExperienceManager
-import torch.distributions as dist
+from models.DQN import DQN
+from models.experience_replay import ExperienceManagerInterface, ExperienceManager, PrioritizedExperienceManager, PrioritizedExperienceManager2
+from models.vpi_distribution import DistributionStrategy, UniformStrategy, NormalStrategy
 
 
-class DistributionStrategy:
-    def __init__(self, state_size: List[int], actions_amount: int, device: torch.device):
-        self.state_size: List[int] = state_size
-        self.actions_amount: int = actions_amount
-        self.device: torch.device = device
-
-        self.policy_network: BayesModel
-        self.target_network: BayesModel
-
-    def policy_kl_loss(self) -> Tensor:
-        return self.policy_network.kl_loss()
-    
-    def pass_posterior_to_prior(self) -> None:
-        self.policy_network.pass_posterior_to_prior()
-
-    def copy_policy_to_target(self) -> None:
-        self.target_network = copy.deepcopy(self.policy_network)
-
-    def get_state_q_values(self, state: Tensor) -> Tensor:
-        raise NotImplementedError
-    
-    def get_target_q_values(self, state: Tensor) -> Tensor:
-        raise NotImplementedError
-    
-    def get_inference_action(self, state: Tensor) -> int:
-        raise NotImplementedError
-    
-    def get_state_actions_vpi(self, state: Tensor) -> Tensor:
-        raise NotImplementedError
-    
-
-class UniformStrategy(DistributionStrategy):
-    def __init__(self, state_size: List[int], actions_amount: int, device: torch.device):
-        super().__init__(state_size, actions_amount, device)
-        self.policy_network: BayesValueModelUniform = BayesValueModelUniform(self.state_size, self.actions_amount).to(self.device)
-        self.policy_network.prior_to_device(self.device)
-        self.target_network = copy.deepcopy(self.policy_network)
-
-    def get_state_q_values(self, state: Tensor) -> Tensor:
-        q_values: Tensor
-        q_values, _, _ = self.policy_network(state)
-        return q_values
-    
-    def get_target_q_values(self, state: Tensor) -> Tensor:
-        with torch.no_grad():
-            q_values: Tensor
-            q_values, _, _ = self.target_network(state)
-            return q_values
-        
-    def get_inference_action(self, state: Tensor) -> int:
-        with torch.no_grad():
-            state = state.to(self.device)
-            _, q_value_r1, q_value_r2 = self.policy_network(state)
-            return ((q_value_r1 + q_value_r2) / 2.0).argmax(dim=-1).item()
-        
-    def get_state_actions_vpi(self, state: Tensor) -> Tensor:
-        sample_q_values, q_value_r1, q_value_r2 = self.policy_network(state)
-        for i in range(self.actions_amount):
-            if q_value_r1[i] > q_value_r2[i]:
-                temp = q_value_r1[i]
-                q_value_r1[i] = q_value_r2[i]
-                q_value_r2[i] = temp
-        
-        q_value_means: Tensor = (q_value_r1 + q_value_r2) / 2.0
-        sorted_index_q_value_means = q_value_means.sort()[1]
-        greedy_action = sorted_index_q_value_means[-1]
-        second_greedy_action = sorted_index_q_value_means[-2]
-
-        vpis: Tensor = torch.tensor([1e-5 for _ in range(self.actions_amount)], dtype=torch.float32).to(self.device)
-        for a in range(self.actions_amount):
-            if a != greedy_action:
-                action_range_min = q_value_r1[a]
-                action_range_max = q_value_r2[a]
-                greedy_action_mean = q_value_means[greedy_action]
-                if action_range_max > greedy_action_mean:
-                    prob_density: Tensor = 1.0 / (action_range_max - action_range_min)
-                    if action_range_min < greedy_action_mean:
-                        vpis[a] += (action_range_max - greedy_action_mean)**2 * prob_density / 2.0
-                    else:
-                        vpis[a] += (action_range_max - action_range_min)**2 * prob_density / 2.0
-            else:
-                greedy_range_min = q_value_r1[greedy_action]
-                greedy_range_max = q_value_r2[greedy_action]
-                second_greedy_action_mean = q_value_means[second_greedy_action]
-                if greedy_range_min < second_greedy_action_mean:
-                    prob_density = 1.0 / (greedy_range_max - greedy_range_min)
-                    if second_greedy_action_mean < greedy_range_max:
-                        vpis[a] += (second_greedy_action_mean - greedy_range_min)**2 * prob_density / 2.0
-                    else:
-                        vpis[a] += (greedy_range_max - greedy_range_min)**2 * prob_density / 2.0
-
-        return vpis
-
-
-class NormalStrategy(DistributionStrategy):
-    def __init__(self, state_size: List[int], actions_amount: int, device: torch.device):
-        super().__init__(state_size, actions_amount, device)
-        self.policy_network: BayesValueModelNormal2 = BayesValueModelNormal2(self.state_size, self.actions_amount).to(self.device)
-        self.policy_network.prior_to_device(self.device)
-        self.target_network = copy.deepcopy(self.policy_network)
-
-        self.normal: dist.Normal = dist.Normal(loc=0.0, scale=1.0)
-
-    def get_state_q_values(self, state: Tensor) -> Tensor:
-        q_values: Tensor
-        q_values, _, _ = self.policy_network(state)
-        return q_values
-    
-    def get_target_q_values(self, state: Tensor) -> Tensor:
-        with torch.no_grad():
-            q_values: Tensor
-            q_values, _, _ = self.target_network(state)
-            return q_values
-        
-    def get_inference_action(self, state: Tensor) -> int:
-        with torch.no_grad():
-            state = state.to(self.device)
-            mu: Tensor
-            _, mu, _ = self.policy_network(state)
-            return mu.argmax(dim=-1).item()
-
-    def get_state_actions_vpi(self, state: Tensor) -> Tensor:
-        mu: Tensor
-        _, mu, sigma = self.policy_network(state)
-        
-        sorted_index_q_value_means = mu.sort()[1]
-        greedy_action = sorted_index_q_value_means[-1]
-        greedy_action_mean = mu[greedy_action]
-        second_greedy_action = sorted_index_q_value_means[-2]
-        second_greedy_action_mean = mu[second_greedy_action]
-
-
-        z: Tensor = (greedy_action_mean - mu) / sigma
-        z[greedy_action] = (second_greedy_action_mean - mu[greedy_action]) / sigma[greedy_action]
-        pdf: Tensor = self.normal.log_prob(z).exp()
-        cdf: Tensor = self.normal.cdf(z)
-
-        auxiliary_tensor: Tensor = mu - greedy_action_mean
-        auxiliary_tensor2: Tensor = 1.0 - cdf
-        auxiliary_tensor[greedy_action] = second_greedy_action_mean - mu[greedy_action]
-        auxiliary_tensor2[greedy_action] = cdf[greedy_action]
-
-        vpis: Tensor = sigma * pdf + auxiliary_tensor * auxiliary_tensor2
-        vpis += 1e-5
-        return vpis
 
 # TODO: implement n-step return
-class VPIValueModelManager(ValueModelManager):
+class VPIValueModelManager:
     def __init__(self, state_size: List[int], actions_amount: int, gamma: float, use_uniform_distribution: bool, batch_size: int, learning_rate: float, 
                  kl_weight: float, updates_to_pass_posterior: int, experience_replay_max_size: int, experience_replay_state_to_uint8: bool, 
                  updates_to_renew_target_network: int, device: torch.device):
@@ -167,48 +21,92 @@ class VPIValueModelManager(ValueModelManager):
         self.updates_to_pass_posterior: int = updates_to_pass_posterior
         self.use_uniform_distribution: bool = use_uniform_distribution
         self.q_value_models: DistributionStrategy
-        super().__init__(
-            state_size,
-            actions_amount,
-            gamma,
-            batch_size,
-            learning_rate,
-            experience_replay_max_size,
-            experience_replay_state_to_uint8,
-            updates_to_renew_target_network,
-            device
-        )
+        
+        self.state_size: List[int] = state_size
+        self.actions_amount: int = actions_amount
+        self.device: torch.device = device
+        self.gamma: float = gamma
 
-    def initialize_models(self) -> None:
+        self.alpha: float = 1.0
+        self.beta: float = 1.0
+
         if self.use_uniform_distribution:
             self.q_value_models = UniformStrategy(self.state_size, self.actions_amount, self.device)
         else:
             self.q_value_models = NormalStrategy(self.state_size, self.actions_amount, self.device)
 
-        # TODO: Refactor later:
-        self.policy_network = self.q_value_models.policy_network
-        self.target_network = self.q_value_models.target_network
+        self.optimizer: Optimizer = Adam(self.q_value_models.policy_network.parameters(), lr=learning_rate)
+        self.loss_function: torch.nn.MSELoss = torch.nn.HuberLoss(reduction="none")
+
+        self.experience_manager: PrioritizedExperienceManager = PrioritizedExperienceManager(experience_replay_max_size, batch_size, state_size, 
+                                                                                             experience_replay_state_to_uint8, self.alpha, self.beta, device)
+        self.updates_to_renew_target_network: int = updates_to_renew_target_network
+        self.update_count: int = 0
 
     def get_state_q_values(self, state: Tensor) -> Tensor:
         return self.q_value_models.get_state_q_values(state)
     
     def get_target_q_values(self, state: Tensor) -> Tensor:
         return self.q_value_models.get_target_q_values(state)
-        
-    def model_loss(self) -> Tensor:
-        return self.q_value_models.policy_kl_loss() * self.kl_weight
-    
-    def post_update(self) -> None:
-        if self.update_count % self.updates_to_pass_posterior == 0:
-            self.q_value_models.pass_posterior_to_prior()
-        if self.update_count % self.updates_to_renew_target_network == 0:
-            self.q_value_models.copy_policy_to_target()
 
     def get_inference_action(self, state: Tensor) -> int:
         return self.q_value_models.get_inference_action(state)
     
-    def get_state_actions_vpi(self, state: Tensor) -> Tensor:
-        return self.q_value_models.get_state_actions_vpi(state)
+    def get_actions_vpi_from_state(self, state: Tensor) -> Tensor:
+        return self.q_value_models.get_actions_vpi_from_state(state)
+    
+    def improve(self, state: Tensor, action: int, reward: float, next_state: Tensor, episode_terminated: bool, priority: float = 1.0) -> None:
+        self.experience_manager.add_experience(state, action, reward, next_state, episode_terminated, priority=priority)
+        if self.experience_manager.can_get_batch():
+            self.update_model()
+
+    def get_expected_action_rewards(self, reward_tensor: Tensor, next_state_tensor: Tensor, episode_terminated_tensor: Tensor, use_ddqn: bool = True) -> Tensor:
+        with torch.no_grad():
+            if not use_ddqn:
+                predicted_next_rewards: Tensor = self.get_target_q_values(next_state_tensor)
+                predicted_next_max_reward: Tensor = predicted_next_rewards.max(dim=-1, keepdim=True)[0].detach()
+                expected_action_rewards: Tensor = reward_tensor + self.gamma * predicted_next_max_reward * (1 - episode_terminated_tensor)
+                return expected_action_rewards
+            
+            policy_next_state_rewards: Tensor = self.get_state_q_values(next_state_tensor)
+            policy_argmax_actions: Tensor = policy_next_state_rewards.argmax(dim=-1, keepdim=True)
+            target_next_state_rewards: Tensor = self.get_target_q_values(next_state_tensor)
+            predicted_next_max_reward: Tensor = target_next_state_rewards.gather(dim=-1, index=policy_argmax_actions)
+            expected_action_rewards: Tensor = reward_tensor + self.gamma * predicted_next_max_reward * (1 - episode_terminated_tensor)
+            return expected_action_rewards
+
+    def update_model(self) -> None:
+        experience_tensors = self.experience_manager.get_batch()
+
+        state_tensor: Tensor = experience_tensors[0]
+        action_tensor: Tensor = experience_tensors[1]
+        reward_tensor: Tensor = experience_tensors[2]
+        next_state_tensor: Tensor = experience_tensors[3]
+        episode_terminated_tensor: Tensor = experience_tensors[4]
+
+        predicted_rewards: Tensor = self.get_state_q_values(state_tensor)
+        predicted_action_rewards: Tensor = predicted_rewards.gather(dim=-1, index=action_tensor)
+
+        expected_action_rewards: Tensor = self.get_expected_action_rewards(reward_tensor, next_state_tensor, episode_terminated_tensor)
+        loss: Tensor = self.loss_function(predicted_action_rewards, expected_action_rewards)
+
+        weights: Tensor = self.experience_manager.get_last_batch_weights()
+        weights = weights / weights.max()
+        loss = (weights * loss.squeeze()).mean()
+
+        loss += self.q_value_models.policy_kl_loss() * self.kl_weight
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+        self.experience_manager.update_priorities(self.q_value_models.get_vpi_from_state_action(state_tensor, action_tensor))
+
+        self.update_count += 1
+        if self.update_count % self.updates_to_pass_posterior == 0:
+            self.q_value_models.pass_posterior_to_prior()
+        if self.update_count % self.updates_to_renew_target_network == 0:
+            self.q_value_models.copy_policy_to_target()
 
 
 
@@ -217,11 +115,14 @@ class VPIDQN(DQN):
                  value_batch_size: int = 32, updates_to_pass_posterior: int = 512, 
                  experience_replay_max_size: int = 4096,  experience_replay_state_to_uint8: bool = False,
                  updates_to_renew_target_network: int = 256, initial_eps: float = 0.5, min_eps: float = 0.1, total_steps_of_eps_decay: int = 100000,
-                 use_uniform_distribution: bool = False, load_model_path: str = None):
+                 use_uniform_distribution: bool = False, alpha: float = 1.0, beta: float = 1.0, load_model_path: str = None):
         self.value_kl_weight: float = value_kl_weight
         self.updates_to_pass_posterior: int = updates_to_pass_posterior
         self.use_uniform_distribution: bool = use_uniform_distribution
         self.value_model_manager: VPIValueModelManager
+        self.prev_state_action_vpi: float = None
+        self.alpha: float = alpha
+        self.beta: float = beta
         super().__init__(state_size, 
                          actions_amount, 
                          gamma,
@@ -258,11 +159,20 @@ class VPIDQN(DQN):
             q_values: Tensor = self.value_model_manager.get_state_q_values(state)
             return q_values.argmax(dim=-1).item()
 
-        vpis: Tensor = self.value_model_manager.get_state_actions_vpi(state)
-        return vpis.multinomial(1).item()
+        vpis: Tensor = self.value_model_manager.get_actions_vpi_from_state(state)
+        action: int = vpis.multinomial(1).item()
+        self.prev_state_action_vpi = vpis[action].item()
+        return action
 
     def inference_next_action(self, state: Tensor) -> int:
         return self.value_model_manager.get_inference_action(state)
+    
+    def improve(self, state: Tensor, action: int, reward: float, next_state: Tensor, episode_terminated: bool) -> None:
+        self.value_model_manager.improve(state, action, reward, next_state, episode_terminated, priority=self.prev_state_action_vpi)
+        if self.eps > self.min_eps:
+            self.eps_decay_step_count += 1
+            proportion: float = self.eps_decay_step_count / self.total_steps_of_eps_decay
+            self.eps = proportion * self.min_eps + (1 - proportion) * self.initial_eps
 
     def get_params_dict(self):
         param_dict: Dict = {
@@ -277,7 +187,9 @@ class VPIDQN(DQN):
             "initial_eps": self.initial_eps,
             "min_eps": self.min_eps,
             "total_steps_of_eps_decay": self.total_steps_of_eps_decay,
-            "use_uniform_distribution": self.use_uniform_distribution
+            "use_uniform_distribution": self.use_uniform_distribution,
+            "alpha": self.alpha,
+            "beta": self.beta
         }
         return param_dict
 
@@ -296,8 +208,10 @@ class VPIDQN(DQN):
                       self.min_eps, 
                       self.total_steps_of_eps_decay,
                       self.use_uniform_distribution,
+                      self.alpha,
+                      self.beta,
                       None)
     
     def save(self) -> None:
-        torch.save(self.value_model_manager.policy_network.state_dict(), "./saved_models/vpidqn.pth")
+        torch.save(self.value_model_manager.q_value_models.policy_network.state_dict(), "./saved_models/vpidqn.pth")
 
