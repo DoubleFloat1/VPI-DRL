@@ -135,7 +135,7 @@ class RaceTrack(GymEnv):
 
 
 class AtariEnv(ImageGymEnv):
-    def __init__(self, gym_name: str, actions_amount: int, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84):
+    def __init__(self, gym_name: str, actions_amount: int, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84, clip_reward: bool = True):
         super().__init__()
         self.gym_name = gym_name
         self.state_size = [self.frame_stack_size * 1, screen_size, screen_size]
@@ -143,6 +143,7 @@ class AtariEnv(ImageGymEnv):
         self.noop_max: int = noop_max
         self.frame_skip: int = frame_skip
         self.screen_size: int = screen_size
+        self.clip_reward: bool = clip_reward
 
         self.initialize_frame_stack()
     
@@ -150,27 +151,28 @@ class AtariEnv(ImageGymEnv):
         return AtariWrapper(gym.make(self.gym_name, render_mode=None), 
                             noop_max=self.noop_max, 
                             frame_skip=self.frame_skip,
-                            screen_size=self.screen_size)
+                            screen_size=self.screen_size,
+                            clip_reward=self.clip_reward)
     
     def get_params_dict(self) -> Dict[str, Any]:
-        return {"gym_id": self.gym_name, "noop_max": self.noop_max, "frame_skip": self.frame_skip, "screen_size": self.screen_size}
+        return {"gym_id": self.gym_name, "noop_max": self.noop_max, "frame_skip": self.frame_skip, "screen_size": self.screen_size, "clip_reward": self.clip_reward}
 
 
 
 class SpaceInvaders(AtariEnv):
-    def __init__(self, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84):
-        super().__init__("ALE/SpaceInvaders-v5", 6, noop_max, frame_skip, screen_size)
+    def __init__(self, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84, clip_reward: bool = True):
+        super().__init__("ALE/SpaceInvaders-v5", 6, noop_max, frame_skip, screen_size, clip_reward)
         
 
 class Breakout(AtariEnv):
-    def __init__(self, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84):
-        super().__init__("ALE/Breakout-v5", 4, noop_max, frame_skip, screen_size)
+    def __init__(self, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84, clip_reward: bool = True):
+        super().__init__("ALE/Breakout-v5", 4, noop_max, frame_skip, screen_size, clip_reward)
     
 
 class Asteroid(AtariEnv):
-    def __init__(self, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84):
-        super().__init__("ALE/Asteroids-v5", 14, noop_max, frame_skip, screen_size)
+    def __init__(self, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84, clip_reward: bool = True):
+        super().__init__("ALE/Asteroids-v5", 14, noop_max, frame_skip, screen_size, clip_reward)
 
 class Asterisk(AtariEnv):
-    def __init__(self, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84):
-        super().__init__("ALE/Asterix-v5", 9, noop_max, frame_skip, screen_size)
+    def __init__(self, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84, clip_reward: bool = True):
+        super().__init__("ALE/Asterix-v5", 9, noop_max, frame_skip, screen_size, clip_reward)

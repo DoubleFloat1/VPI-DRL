@@ -215,8 +215,9 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-test2.py
+temp.py
 vpidqn.txt
 dqn.txt
 data/
 saved_models/
+test/

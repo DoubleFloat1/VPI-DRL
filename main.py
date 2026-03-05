@@ -202,10 +202,10 @@ def main(gym_env: GymEnv, model: RLModel, data_file: str, create_new_data_file: 
 
 
 if __name__ == "__main__":
-    #gym_env = SpaceInvaders(noop_max=5, frame_skip=2)
-    gym_env = LunarLander()
+    gym_env = SpaceInvaders(noop_max=5, frame_skip=2)
+    #gym_env = LunarLander()
 
-    train_step_amount: int = 800
+    train_step_amount: int = 80000
     training_epochs: int = 100
     test_episode_amount: int = 100
     trials_amount: int = 1
@@ -226,9 +226,9 @@ if __name__ == "__main__":
     '''
     
     vpidqn = VPIDQN(gym_env.state_size, gym_env.actions_amount, 
-                    experience_replay_max_size=7500,
+                    experience_replay_max_size=750000,
                     experience_replay_state_to_uint8=gym_env.image_state,
-                    value_lr=3e-4,
+                    value_lr=1e-5,
                     updates_to_renew_target_network=2500,
                     value_kl_weight=0.1,
                     updates_to_pass_posterior=2500,
@@ -243,4 +243,4 @@ if __name__ == "__main__":
     
 
     #main(gym_env, dqn, "dqn.txt", train_step_amount=train_step_amount, training_epochs=training_epochs, test_episode_amount=test_episode_amount,trials_amount=trials_amount)
-    main(gym_env, vpidqn, "vpidqn.txt", train_step_amount=train_step_amount, training_epochs=training_epochs, test_episode_amount=test_episode_amount,trials_amount=trials_amount)
+    main(gym_env, vpidqn, "vpidqn_p.txt", train_step_amount=train_step_amount, training_epochs=training_epochs, test_episode_amount=test_episode_amount,trials_amount=trials_amount)

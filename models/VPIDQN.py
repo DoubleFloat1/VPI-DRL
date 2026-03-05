@@ -16,7 +16,7 @@ from models.vpi_distribution import DistributionStrategy, UniformStrategy, Norma
 class VPIValueModelManager:
     def __init__(self, state_size: List[int], actions_amount: int, gamma: float, use_uniform_distribution: bool, batch_size: int, learning_rate: float, 
                  kl_weight: float, updates_to_pass_posterior: int, experience_replay_max_size: int, experience_replay_state_to_uint8: bool, 
-                 updates_to_renew_target_network: int, device: torch.device):
+                 updates_to_renew_target_network: int, alpha: float, beta: float, device: torch.device):
         self.kl_weight: float = kl_weight
         self.updates_to_pass_posterior: int = updates_to_pass_posterior
         self.use_uniform_distribution: bool = use_uniform_distribution
@@ -27,8 +27,8 @@ class VPIValueModelManager:
         self.device: torch.device = device
         self.gamma: float = gamma
 
-        self.alpha: float = 1.0
-        self.beta: float = 1.0
+        self.alpha: float = alpha
+        self.beta: float = beta
 
         if self.use_uniform_distribution:
             self.q_value_models = UniformStrategy(self.state_size, self.actions_amount, self.device)
@@ -111,10 +111,10 @@ class VPIValueModelManager:
 
 
 class VPIDQN(DQN):
-    def __init__(self, state_size: List[int], actions_amount: int, gamma: float = 0.99, value_lr: float = 3e-4, value_kl_weight: float = 0.1, 
+    def __init__(self, state_size: List[int], actions_amount: int, gamma: float = 0.99, value_lr: float = 1e-5, value_kl_weight: float = 0.1, 
                  value_batch_size: int = 32, updates_to_pass_posterior: int = 512, 
                  experience_replay_max_size: int = 4096,  experience_replay_state_to_uint8: bool = False,
-                 updates_to_renew_target_network: int = 256, initial_eps: float = 0.5, min_eps: float = 0.1, total_steps_of_eps_decay: int = 100000,
+                 updates_to_renew_target_network: int = 256, initial_eps: float = 1.0, min_eps: float = 0.1, total_steps_of_eps_decay: int = 100000,
                  use_uniform_distribution: bool = False, alpha: float = 1.0, beta: float = 1.0, load_model_path: str = None):
         self.value_kl_weight: float = value_kl_weight
         self.updates_to_pass_posterior: int = updates_to_pass_posterior
@@ -150,6 +150,8 @@ class VPIDQN(DQN):
             self.experience_replay_max_size,
             self.experience_replay_state_to_uint8,
             self.updates_to_renew_target_network,
+            self.alpha,
+            self.beta,
             self.device
         )
 

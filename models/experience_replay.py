@@ -171,6 +171,7 @@ class PrioritizedExperienceManager(ExperienceManagerInterface):
 
         self.last_batch_indexes: Tensor = None
         self.last_batch_prob_weights: Tensor = None
+        self.prob_weights_sum: Tensor = torch.zeros(1, dtype=torch.float32).to(device)
 
     def add_experience(self, state: Tensor, action: int, reward: float, next_state: Tensor, episode_terminated: bool, priority: float = 1.0) -> None:
         if self.state_dtype == torch.uint8:
@@ -183,7 +184,10 @@ class PrioritizedExperienceManager(ExperienceManagerInterface):
         self.next_state_batch[self.next_index] = next_state.to(self.device)
         self.episode_terminated_batch[self.next_index] = torch.tensor([episode_terminated], dtype=torch.float32).to(self.device)
 
+        delta: Tensor = priority**self.alpha - self.priorities[self.next_index]
         self.priorities[self.next_index] = priority**self.alpha
+        self.prob_weights_sum += delta
+
         if self.current_size < self.max_size:
             self.current_size += 1
         self.next_index = (self.next_index + 1) % self.max_size
@@ -192,6 +196,7 @@ class PrioritizedExperienceManager(ExperienceManagerInterface):
         return self.current_size >= self.batch_size
     
     def get_batch(self) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
+        # TODO: May be too much exploration with vpi.
         indexes: Tensor = self.priorities.multinomial(self.batch_size, replacement=True)
         self.last_batch_indexes = indexes
         self.last_batch_prob_weights = self.priorities[indexes]
@@ -218,12 +223,20 @@ class PrioritizedExperienceManager(ExperienceManagerInterface):
         self.priorities: Tensor = torch.zeros(self.max_size, dtype=torch.float32).to(self.device)
         self.current_size = 0
         self.next_index = 0
+
+        self.last_batch_indexes: Tensor = None
+        self.last_batch_prob_weights: Tensor = None
+        self.prob_weights_sum: Tensor = torch.zeros(1, dtype=torch.float32).to(self.device)
     
     def update_priorities(self, priorities: Tensor) -> None:
-        self.priorities[self.last_batch_indexes] = priorities**self.alpha
+        for i in range(len(priorities)):
+            index = self.last_batch_indexes[i]
+            delta: Tensor = priorities[i]**self.alpha - self.priorities[index]
+            self.priorities[index] = priorities[i]**self.alpha
+            self.prob_weights_sum += delta
 
     def get_last_batch_weights(self) -> Tensor:
-        return (self.current_size * self.last_batch_prob_weights)**(-self.beta)
+        return (self.current_size * self.last_batch_prob_weights / self.prob_weights_sum)**(-self.beta)
 
 
 

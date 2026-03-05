@@ -134,7 +134,11 @@ class NormalStrategy(DistributionStrategy):
         sigma: Tensor
         with torch.no_grad():
             _, mu, sigma = self.policy_network(state)
+            return self._get_actions_vpi_from_state(mu, sigma)
         
+        
+    
+    def _get_actions_vpi_from_state(self, mu: Tensor, sigma: Tensor) -> Tensor:
         sorted_index_q_value_means = mu.sort()[1]
         greedy_action = sorted_index_q_value_means[-1]
         greedy_action_mean = mu[greedy_action]
@@ -161,6 +165,10 @@ class NormalStrategy(DistributionStrategy):
         sigma: Tensor
         with torch.no_grad():
             _, mu, sigma = self.policy_network(state)
+            return self._get_vpi_from_state_action(mu, sigma, action)
+        
+    
+    def _get_vpi_from_state_action(self, mu: Tensor, sigma: Tensor, action: Tensor) -> Tensor:
         action_mu: Tensor = mu.gather(dim=-1, index=action).squeeze()
         action_sigma: Tensor = sigma.gather(dim=-1, index=action).squeeze()
 
