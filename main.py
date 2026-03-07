@@ -7,6 +7,7 @@ from gymnasium import Env
 from typing import List, Tuple, Dict, Any
 from numpy import ndarray
 import time
+import datetime
 from gym_envs import *
 from custom_envs.race_track import RacetrackEnv
 
@@ -202,45 +203,61 @@ def main(gym_env: GymEnv, model: RLModel, data_file: str, create_new_data_file: 
 
 
 if __name__ == "__main__":
-    gym_env = SpaceInvaders(noop_max=5, frame_skip=2)
-    #gym_env = LunarLander()
+    time_before: datetime = datetime.datetime.now()
+    try:
+        #gym_env = SpaceInvaders(noop_max=5, frame_skip=2)
+        gym_env = LunarLander()
 
-    train_step_amount: int = 80000
-    training_epochs: int = 100
-    test_episode_amount: int = 100
-    trials_amount: int = 1
+        train_step_amount: int = 800
+        training_epochs: int = 10
+        test_episode_amount: int = 100
+        trials_amount: int = 1
 
-    total_steps_of_eps_decay: int = round(0.125 * train_step_amount * training_epochs)
+        total_steps_of_eps_decay: int = round(0.125 * train_step_amount * training_epochs)
+        total_steps_of_beta_growth: int = train_step_amount * training_epochs
 
-    '''
-    dqn = DQN(gym_env.state_size, gym_env.actions_amount, 
-              experience_replay_max_size=750000,
-              experience_replay_state_to_uint8=gym_env.image_state,
-              updates_to_renew_target_network=2500,
-              value_lr=1e-4,
-              initial_eps=1.0,
-              min_eps=0.1,
-              total_steps_of_eps_decay=total_steps_of_eps_decay,
-              load_model_path=None
-              )
-    '''
-    
-    vpidqn = VPIDQN(gym_env.state_size, gym_env.actions_amount, 
-                    experience_replay_max_size=750000,
-                    experience_replay_state_to_uint8=gym_env.image_state,
-                    value_lr=1e-5,
-                    updates_to_renew_target_network=2500,
-                    value_kl_weight=0.1,
-                    updates_to_pass_posterior=2500,
-                    initial_eps=1.0,
-                    min_eps=0.1,
-                    total_steps_of_eps_decay=total_steps_of_eps_decay,
-                    use_uniform_distribution=False,
-                    alpha=0.7,
-                    beta=1.0,
-                    load_model_path=None
-                    )
-    
+        '''
+        dqn = DQN(gym_env.state_size, gym_env.actions_amount, 
+                experience_replay_max_size=750000,
+                experience_replay_state_to_uint8=gym_env.image_state,
+                updates_to_renew_target_network=2500,
+                value_lr=1e-4,
+                initial_eps=1.0,
+                min_eps=0.1,
+                total_steps_of_eps_decay=total_steps_of_eps_decay,
+                load_model_path=None
+                )
+        '''
+        
+        vpidqn = VPIDQN(gym_env.state_size, gym_env.actions_amount, 
+                        experience_replay_max_size=7500,
+                        experience_replay_state_to_uint8=gym_env.image_state,
+                        value_lr=6e-5,
+                        updates_to_renew_target_network=2500,
+                        value_kl_weight=0.1,
+                        updates_to_pass_posterior=2500,
+                        initial_eps=1.0,
+                        min_eps=0.1,
+                        total_steps_of_eps_decay=total_steps_of_eps_decay,
+                        use_uniform_distribution=False,
+                        alpha=0.6,
+                        initial_beta=0.4,
+                        total_steps_of_beta_growth=total_steps_of_beta_growth,
+                        load_model_path=None
+                        )
+        
 
-    #main(gym_env, dqn, "dqn.txt", train_step_amount=train_step_amount, training_epochs=training_epochs, test_episode_amount=test_episode_amount,trials_amount=trials_amount)
-    main(gym_env, vpidqn, "vpidqn_p.txt", train_step_amount=train_step_amount, training_epochs=training_epochs, test_episode_amount=test_episode_amount,trials_amount=trials_amount)
+        #main(gym_env, dqn, "dqn.txt", train_step_amount=train_step_amount, training_epochs=training_epochs, test_episode_amount=test_episode_amount,trials_amount=trials_amount)
+        main(gym_env, vpidqn, "vpidqn_p.txt", train_step_amount=train_step_amount, training_epochs=training_epochs, test_episode_amount=test_episode_amount,trials_amount=trials_amount)
+    except KeyboardInterrupt:
+        time_after: datetime = datetime.datetime.now()
+        delta: datetime.timedelta = time_after - time_before
+        with open("runtime.txt", "a") as file:
+            file.write(f"{time_before},{time_after},{delta.seconds}s,Interrupted\n")
+        
+        raise KeyboardInterrupt
+    else:
+        time_after: datetime = datetime.datetime.now()
+        delta: datetime.timedelta = time_after - time_before
+        with open("runtime.txt", "a") as file:
+            file.write(f"{time_before},{time_after},{delta.seconds}s,Completed\n")

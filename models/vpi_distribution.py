@@ -1,9 +1,10 @@
 import torch
 from torch import Tensor
-from typing import List
+from typing import List, Tuple
 import copy
 import torch.distributions as dist
 from models.network import BayesValueModelNormal, BayesValueModelUniform, BayesModel, BayesValueModelNormal
+from models.experience_replay import PrioritizedExperienceManager
 
 class DistributionStrategy:
     def __init__(self, state_size: List[int], actions_amount: int, device: torch.device):
@@ -26,6 +27,9 @@ class DistributionStrategy:
     def get_state_q_values(self, state: Tensor) -> Tensor:
         raise NotImplementedError
     
+    def get_predicted_state_action_rewards(self, state: Tensor, action: Tensor) -> Tensor:
+        raise NotImplementedError
+    
     def get_target_q_values(self, state: Tensor) -> Tensor:
         raise NotImplementedError
     
@@ -33,9 +37,6 @@ class DistributionStrategy:
         raise NotImplementedError
     
     def get_actions_vpi_from_state(self, state: Tensor) -> Tensor:
-        raise NotImplementedError
-    
-    def get_vpi_from_state_action(self, state: Tensor, action: Tensor) -> Tensor:
         raise NotImplementedError
     
 
@@ -103,18 +104,27 @@ class UniformStrategy(DistributionStrategy):
 
 
 class NormalStrategy(DistributionStrategy):
-    def __init__(self, state_size: List[int], actions_amount: int, device: torch.device):
+    def __init__(self, state_size: List[int], actions_amount: int, device: torch.device, pem: PrioritizedExperienceManager = None):
         super().__init__(state_size, actions_amount, device)
         self.policy_network: BayesValueModelNormal = BayesValueModelNormal(self.state_size, self.actions_amount).to(self.device)
         self.policy_network.prior_to_device(self.device)
         self.target_network = copy.deepcopy(self.policy_network)
 
         self.normal: dist.Normal = dist.Normal(loc=0.0, scale=1.0)
+        self.prioritized_experience_manager: PrioritizedExperienceManager = pem
 
     def get_state_q_values(self, state: Tensor) -> Tensor:
-        q_values: Tensor
         q_values, _, _ = self.policy_network(state)
         return q_values
+    
+    def get_predicted_state_action_rewards(self, state: Tensor, action: Tensor) -> Tensor:
+        predicted_rewards: Tensor
+        mu: Tensor
+        sigma: Tensor
+        predicted_rewards, mu, sigma = self.policy_network(state)
+        predicted_action_rewards: Tensor = predicted_rewards.gather(dim=-1, index=action)
+        self._update_experience_priority(mu.detach(), sigma.detach(), action)
+        return predicted_action_rewards
     
     def get_target_q_values(self, state: Tensor) -> Tensor:
         with torch.no_grad():
@@ -159,16 +169,8 @@ class NormalStrategy(DistributionStrategy):
         vpis: Tensor = sigma * pdf + auxiliary_tensor * auxiliary_tensor2
         vpis += 1e-5
         return vpis
-    
-    def get_vpi_from_state_action(self, state: Tensor, action: Tensor) -> Tensor:
-        mu: Tensor
-        sigma: Tensor
-        with torch.no_grad():
-            _, mu, sigma = self.policy_network(state)
-            return self._get_vpi_from_state_action(mu, sigma, action)
         
-    
-    def _get_vpi_from_state_action(self, mu: Tensor, sigma: Tensor, action: Tensor) -> Tensor:
+    def _update_experience_priority(self, mu: Tensor, sigma: Tensor, action: Tensor) -> Tensor:
         action_mu: Tensor = mu.gather(dim=-1, index=action).squeeze()
         action_sigma: Tensor = sigma.gather(dim=-1, index=action).squeeze()
 
@@ -193,4 +195,8 @@ class NormalStrategy(DistributionStrategy):
 
         vpis: Tensor = action_sigma * pdf + aux_tensor1 * aux_tensor2
         vpis += 1e-5
+
+        if self.prioritized_experience_manager != None:
+            self.prioritized_experience_manager.update_priorities(vpis)
+        
         return vpis

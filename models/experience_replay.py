@@ -148,13 +148,21 @@ class SumTree:
 
 
 class PrioritizedExperienceManager(ExperienceManagerInterface):
-    def __init__(self, max_size: int, batch_size: int, state_size: List[int], state_to_uint8: bool, alpha: float, beta: float, device: torch.device):
+    def __init__(self, max_size: int, batch_size: int, state_size: List[int], state_to_uint8: bool, alpha: float, initial_beta: float, 
+                 total_steps_of_beta_growth: int, device: torch.device):
         self.device: torch.device = device
         self.state_size: List[int] = state_size
         self.max_size: int = max_size
+
         self.batch_size: int = batch_size
+        self.vpi_batch_size: int = self.batch_size // 2
+        self.rand_batch_size: int = self.batch_size - self.vpi_batch_size
+
         self.alpha: float = alpha
-        self.beta: float = beta
+        self.initial_beta: float = initial_beta
+        self.total_steps_of_beta_growth: int = total_steps_of_beta_growth
+        self.beta: float = initial_beta
+        self.step_count: int = 0
 
         self.state_batch_dimensions: List[int] = [max_size] + state_size
         self.state_dtype: torch.dtype = torch.uint8 if state_to_uint8 else torch.float32
@@ -170,7 +178,7 @@ class PrioritizedExperienceManager(ExperienceManagerInterface):
         self.next_index: int = 0
 
         self.last_batch_indexes: Tensor = None
-        self.last_batch_prob_weights: Tensor = None
+        self.last_batch_prob_weights: Tensor = torch.zeros(self.batch_size, dtype=torch.float32).to(device)
         self.prob_weights_sum: Tensor = torch.zeros(1, dtype=torch.float32).to(device)
 
     def add_experience(self, state: Tensor, action: int, reward: float, next_state: Tensor, episode_terminated: bool, priority: float = 1.0) -> None:
@@ -191,13 +199,21 @@ class PrioritizedExperienceManager(ExperienceManagerInterface):
         if self.current_size < self.max_size:
             self.current_size += 1
         self.next_index = (self.next_index + 1) % self.max_size
+
+        self.step_count += 1
+        if self.beta < 1.0:
+            prop: float = self.step_count / self.total_steps_of_beta_growth
+            self.beta = prop + (1.0 - prop) * self.initial_beta
     
     def can_get_batch(self) -> bool:
-        return self.current_size >= self.batch_size
+        return self.current_size >= self.batch_size * 100
     
     def get_batch(self) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
         # TODO: May be too much exploration with vpi.
-        indexes: Tensor = self.priorities.multinomial(self.batch_size, replacement=True)
+        indexes1: Tensor = self.priorities.multinomial(self.vpi_batch_size, replacement=True)
+        indexes2: Tensor = torch.tensor(np.random.randint(low=0, high=self.current_size, size=self.rand_batch_size), dtype=torch.int64).to(self.device)
+        indexes: Tensor = torch.cat([indexes1, indexes2])
+
         self.last_batch_indexes = indexes
         self.last_batch_prob_weights = self.priorities[indexes]
 
@@ -225,7 +241,7 @@ class PrioritizedExperienceManager(ExperienceManagerInterface):
         self.next_index = 0
 
         self.last_batch_indexes: Tensor = None
-        self.last_batch_prob_weights: Tensor = None
+        self.last_batch_prob_weights: Tensor = torch.zeros(self.batch_size, dtype=torch.float32).to(self.device)
         self.prob_weights_sum: Tensor = torch.zeros(1, dtype=torch.float32).to(self.device)
     
     def update_priorities(self, priorities: Tensor) -> None:

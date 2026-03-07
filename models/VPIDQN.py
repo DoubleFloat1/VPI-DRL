@@ -16,7 +16,7 @@ from models.vpi_distribution import DistributionStrategy, UniformStrategy, Norma
 class VPIValueModelManager:
     def __init__(self, state_size: List[int], actions_amount: int, gamma: float, use_uniform_distribution: bool, batch_size: int, learning_rate: float, 
                  kl_weight: float, updates_to_pass_posterior: int, experience_replay_max_size: int, experience_replay_state_to_uint8: bool, 
-                 updates_to_renew_target_network: int, alpha: float, beta: float, device: torch.device):
+                 updates_to_renew_target_network: int, alpha: float, initial_beta: float, total_steps_of_beta_growth: int, device: torch.device):
         self.kl_weight: float = kl_weight
         self.updates_to_pass_posterior: int = updates_to_pass_posterior
         self.use_uniform_distribution: bool = use_uniform_distribution
@@ -27,19 +27,19 @@ class VPIValueModelManager:
         self.device: torch.device = device
         self.gamma: float = gamma
 
-        self.alpha: float = alpha
-        self.beta: float = beta
-
-        if self.use_uniform_distribution:
-            self.q_value_models = UniformStrategy(self.state_size, self.actions_amount, self.device)
-        else:
-            self.q_value_models = NormalStrategy(self.state_size, self.actions_amount, self.device)
-
-        self.optimizer: Optimizer = Adam(self.q_value_models.policy_network.parameters(), lr=learning_rate)
         self.loss_function: torch.nn.MSELoss = torch.nn.HuberLoss(reduction="none")
 
         self.experience_manager: PrioritizedExperienceManager = PrioritizedExperienceManager(experience_replay_max_size, batch_size, state_size, 
-                                                                                             experience_replay_state_to_uint8, self.alpha, self.beta, device)
+                                                                                             experience_replay_state_to_uint8, alpha, initial_beta,
+                                                                                             total_steps_of_beta_growth, device)
+        
+        if self.use_uniform_distribution:
+            self.q_value_models = UniformStrategy(self.state_size, self.actions_amount, self.device)
+        else:
+            self.q_value_models = NormalStrategy(self.state_size, self.actions_amount, self.device, pem=self.experience_manager)
+
+        self.optimizer: Optimizer = Adam(self.q_value_models.policy_network.parameters(), lr=learning_rate)
+
         self.updates_to_renew_target_network: int = updates_to_renew_target_network
         self.update_count: int = 0
 
@@ -84,8 +84,7 @@ class VPIValueModelManager:
         next_state_tensor: Tensor = experience_tensors[3]
         episode_terminated_tensor: Tensor = experience_tensors[4]
 
-        predicted_rewards: Tensor = self.get_state_q_values(state_tensor)
-        predicted_action_rewards: Tensor = predicted_rewards.gather(dim=-1, index=action_tensor)
+        predicted_action_rewards: Tensor = self.q_value_models.get_predicted_state_action_rewards(state_tensor, action_tensor)
 
         expected_action_rewards: Tensor = self.get_expected_action_rewards(reward_tensor, next_state_tensor, episode_terminated_tensor)
         loss: Tensor = self.loss_function(predicted_action_rewards, expected_action_rewards)
@@ -100,8 +99,6 @@ class VPIValueModelManager:
         loss.backward()
         self.optimizer.step()
 
-        self.experience_manager.update_priorities(self.q_value_models.get_vpi_from_state_action(state_tensor, action_tensor))
-
         self.update_count += 1
         if self.update_count % self.updates_to_pass_posterior == 0:
             self.q_value_models.pass_posterior_to_prior()
@@ -114,15 +111,17 @@ class VPIDQN(DQN):
     def __init__(self, state_size: List[int], actions_amount: int, gamma: float = 0.99, value_lr: float = 1e-5, value_kl_weight: float = 0.1, 
                  value_batch_size: int = 32, updates_to_pass_posterior: int = 512, 
                  experience_replay_max_size: int = 4096,  experience_replay_state_to_uint8: bool = False,
-                 updates_to_renew_target_network: int = 256, initial_eps: float = 1.0, min_eps: float = 0.1, total_steps_of_eps_decay: int = 100000,
-                 use_uniform_distribution: bool = False, alpha: float = 1.0, beta: float = 1.0, load_model_path: str = None):
+                 updates_to_renew_target_network: int = 256, initial_eps: float = 1.0, min_eps: float = 0.1, total_steps_of_eps_decay: int = 1000000,
+                 use_uniform_distribution: bool = False, alpha: float = 1.0, initial_beta: float = 1.0, total_steps_of_beta_growth: int = 1000000, 
+                 load_model_path: str = None):
         self.value_kl_weight: float = value_kl_weight
         self.updates_to_pass_posterior: int = updates_to_pass_posterior
         self.use_uniform_distribution: bool = use_uniform_distribution
         self.value_model_manager: VPIValueModelManager
         self.prev_state_action_vpi: float = None
         self.alpha: float = alpha
-        self.beta: float = beta
+        self.initial_beta: float = initial_beta
+        self.total_steps_of_beta_growth: int = total_steps_of_beta_growth
         super().__init__(state_size, 
                          actions_amount, 
                          gamma,
@@ -151,7 +150,8 @@ class VPIDQN(DQN):
             self.experience_replay_state_to_uint8,
             self.updates_to_renew_target_network,
             self.alpha,
-            self.beta,
+            self.initial_beta,
+            self.total_steps_of_beta_growth,
             self.device
         )
 
@@ -191,7 +191,8 @@ class VPIDQN(DQN):
             "total_steps_of_eps_decay": self.total_steps_of_eps_decay,
             "use_uniform_distribution": self.use_uniform_distribution,
             "alpha": self.alpha,
-            "beta": self.beta
+            "initial_beta": self.initial_beta,
+            "total_steps_of_beta_growth": self.total_steps_of_beta_growth
         }
         return param_dict
 
@@ -211,7 +212,8 @@ class VPIDQN(DQN):
                       self.total_steps_of_eps_decay,
                       self.use_uniform_distribution,
                       self.alpha,
-                      self.beta,
+                      self.initial_beta,
+                      self.total_steps_of_beta_growth,
                       None)
     
     def save(self) -> None:
