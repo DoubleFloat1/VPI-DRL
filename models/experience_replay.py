@@ -148,15 +148,15 @@ class SumTree:
 
 
 class PrioritizedExperienceManager(ExperienceManagerInterface):
-    def __init__(self, max_size: int, batch_size: int, state_size: List[int], state_to_uint8: bool, alpha: float, initial_beta: float, 
+    def __init__(self, max_size: int, vpi_batch_size: int, rand_batch_size: int, state_size: List[int], state_to_uint8: bool, alpha: float, initial_beta: float, 
                  total_steps_of_beta_growth: int, device: torch.device):
         self.device: torch.device = device
         self.state_size: List[int] = state_size
         self.max_size: int = max_size
 
-        self.batch_size: int = batch_size
-        self.vpi_batch_size: int = self.batch_size // 2
-        self.rand_batch_size: int = self.batch_size - self.vpi_batch_size
+        self.vpi_batch_size: int = vpi_batch_size
+        self.rand_batch_size: int = rand_batch_size
+        self.batch_size: int = vpi_batch_size + rand_batch_size
 
         self.alpha: float = alpha
         self.initial_beta: float = initial_beta

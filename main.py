@@ -77,9 +77,11 @@ def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, trainin
     total_steps_of_beta_growth: int = train_step_amount * training_epochs
 
     vpidqn = VPIDQN(gym_env.state_size, gym_env.actions_amount, 
+                    value_vpi_batch_size=32,
+                    value_rand_batch_size=0,
                     experience_replay_max_size=750000,
                     experience_replay_state_to_uint8=gym_env.image_state,
-                    value_lr=3e-5,
+                    value_lr=1e-5,
                     updates_to_renew_target_network=2500,
                     value_kl_weight=0.1,
                     updates_to_pass_posterior=2500,

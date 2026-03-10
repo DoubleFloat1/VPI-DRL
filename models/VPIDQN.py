@@ -14,8 +14,8 @@ from models.vpi_distribution import DistributionStrategy, UniformStrategy, Norma
 
 # TODO: implement n-step return
 class VPIValueModelManager:
-    def __init__(self, state_size: List[int], actions_amount: int, gamma: float, use_uniform_distribution: bool, batch_size: int, learning_rate: float, 
-                 kl_weight: float, updates_to_pass_posterior: int, experience_replay_max_size: int, experience_replay_state_to_uint8: bool, 
+    def __init__(self, state_size: List[int], actions_amount: int, gamma: float, use_uniform_distribution: bool, vpi_batch_size: int, rand_batch_size: int, 
+                 learning_rate: float, kl_weight: float, updates_to_pass_posterior: int, experience_replay_max_size: int, experience_replay_state_to_uint8: bool, 
                  updates_to_renew_target_network: int, alpha: float, initial_beta: float, total_steps_of_beta_growth: int, device: torch.device):
         self.kl_weight: float = kl_weight
         self.updates_to_pass_posterior: int = updates_to_pass_posterior
@@ -29,7 +29,7 @@ class VPIValueModelManager:
 
         self.loss_function: torch.nn.MSELoss = torch.nn.HuberLoss(reduction="none")
 
-        self.experience_manager: PrioritizedExperienceManager = PrioritizedExperienceManager(experience_replay_max_size, batch_size, state_size, 
+        self.experience_manager: PrioritizedExperienceManager = PrioritizedExperienceManager(experience_replay_max_size, vpi_batch_size, rand_batch_size, state_size, 
                                                                                              experience_replay_state_to_uint8, alpha, initial_beta,
                                                                                              total_steps_of_beta_growth, device)
         
@@ -109,11 +109,13 @@ class VPIValueModelManager:
 
 class VPIDQN(DQN):
     def __init__(self, state_size: List[int], actions_amount: int, gamma: float = 0.99, value_lr: float = 1e-5, value_kl_weight: float = 0.1, 
-                 value_batch_size: int = 32, updates_to_pass_posterior: int = 512, 
+                 value_vpi_batch_size: int = 16, value_rand_batch_size: int = 16, updates_to_pass_posterior: int = 512, 
                  experience_replay_max_size: int = 4096,  experience_replay_state_to_uint8: bool = False,
                  updates_to_renew_target_network: int = 256, initial_eps: float = 1.0, min_eps: float = 0.1, total_steps_of_eps_decay: int = 1000000,
                  use_uniform_distribution: bool = False, alpha: float = 1.0, initial_beta: float = 1.0, total_steps_of_beta_growth: int = 1000000, 
                  load_model_path: str = None):
+        self.value_vpi_batch_size: int = value_vpi_batch_size
+        self.value_rand_batch_size: int = value_rand_batch_size
         self.value_kl_weight: float = value_kl_weight
         self.updates_to_pass_posterior: int = updates_to_pass_posterior
         self.use_uniform_distribution: bool = use_uniform_distribution
@@ -126,7 +128,7 @@ class VPIDQN(DQN):
                          actions_amount, 
                          gamma,
                          value_lr, 
-                         value_batch_size,
+                         value_vpi_batch_size + value_rand_batch_size,
                          experience_replay_max_size,
                          experience_replay_state_to_uint8,
                          updates_to_renew_target_network,
@@ -142,7 +144,8 @@ class VPIDQN(DQN):
             self.actions_amount,
             self.gamma,
             self.use_uniform_distribution,
-            self.value_batch_size,
+            self.value_vpi_batch_size,
+            self.value_rand_batch_size,
             self.value_lr,
             self.value_kl_weight,
             self.updates_to_pass_posterior,
@@ -182,7 +185,8 @@ class VPIDQN(DQN):
             "gamma": self.gamma,
             "value_lr": self.value_lr,
             "value_kl_weight": self.value_kl_weight,
-            "value_batch_size": self.value_batch_size,
+            "value_vpi_batch_size": self.value_vpi_batch_size,
+            "value_rand_batch_size": self.value_rand_batch_size,
             "uptades_to_pass_posterior": self.updates_to_pass_posterior,
             "experience_replay_max_size": self.experience_replay_max_size,
             "updates_to_renew_target_network": self.updates_to_renew_target_network,
@@ -202,7 +206,8 @@ class VPIDQN(DQN):
                       self.gamma, 
                       self.value_lr, 
                       self.value_kl_weight, 
-                      self.value_batch_size,
+                      self.value_vpi_batch_size,
+                      self.value_rand_batch_size,
                       self.updates_to_pass_posterior, 
                       self.experience_replay_max_size, 
                       self.experience_replay_state_to_uint8,
