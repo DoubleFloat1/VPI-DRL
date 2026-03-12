@@ -27,6 +27,9 @@ class DistributionStrategy:
     def get_state_q_values(self, state: Tensor) -> Tensor:
         raise NotImplementedError
     
+    def get_greedy_action(self, state: Tensor) -> Tuple[int, float]:
+        raise NotImplementedError
+    
     def get_predicted_state_action_rewards(self, state: Tensor, action: Tensor) -> Tensor:
         raise NotImplementedError
     
@@ -117,6 +120,13 @@ class NormalStrategy(DistributionStrategy):
         q_values, _, _ = self.policy_network(state)
         return q_values
     
+    def get_greedy_action(self, state: Tensor) -> Tuple[int, float]:
+        q_values: Tensor
+        q_values, mu, sigma = self.policy_network(state)
+        greedy_action: Tensor = q_values.argmax(dim=-1)
+        vpi: Tensor = self._get_state_action_vpi(mu, sigma, greedy_action.unsqueeze(0))
+        return (greedy_action.item(), vpi.item())
+    
     def get_predicted_state_action_rewards(self, state: Tensor, action: Tensor) -> Tensor:
         predicted_rewards: Tensor
         mu: Tensor
@@ -169,8 +179,8 @@ class NormalStrategy(DistributionStrategy):
         vpis: Tensor = sigma * pdf + auxiliary_tensor * auxiliary_tensor2
         vpis += 1e-5
         return vpis
-        
-    def _update_experience_priority(self, mu: Tensor, sigma: Tensor, action: Tensor) -> Tensor:
+    
+    def _get_state_action_vpi(self, mu: Tensor, sigma: Tensor, action: Tensor) -> Tensor:
         action_mu: Tensor = mu.gather(dim=-1, index=action).squeeze()
         action_sigma: Tensor = sigma.gather(dim=-1, index=action).squeeze()
 
@@ -181,10 +191,15 @@ class NormalStrategy(DistributionStrategy):
         greedy_action_mu: Tensor = torch.select(sorted_mu, dim=-1, index=-1)
         second_greedy_action_mu: Tensor = torch.select(sorted_mu, dim=-1, index=-2)
 
-        is_greedy_action = torch.zeros_like(action, dtype=torch.uint8).squeeze()
-        for i in range(len(action)):
-            if action[i] == sorted_mu_indexes[i][-1]:
-                is_greedy_action[i] = 1
+        if mu.dim() == 2:
+            is_greedy_action = torch.zeros_like(action, dtype=torch.uint8).squeeze()
+            for i in range(len(action)):
+                if action[i] == sorted_mu_indexes[i][-1]:
+                    is_greedy_action[i] = 1
+        else:
+            is_greedy_action = torch.zeros_like(action, dtype=torch.uint8)
+            if action == sorted_mu_indexes[-1]:
+                is_greedy_action[0] = 1
         
         z: Tensor = ((is_greedy_action * second_greedy_action_mu + (1 - is_greedy_action) * greedy_action_mu) - action_mu) / action_sigma
         pdf: Tensor = self.normal.log_prob(z).exp()
@@ -195,7 +210,10 @@ class NormalStrategy(DistributionStrategy):
 
         vpis: Tensor = action_sigma * pdf + aux_tensor1 * aux_tensor2
         vpis += 1e-5
-
+        return vpis
+        
+    def _update_experience_priority(self, mu: Tensor, sigma: Tensor, action: Tensor) -> Tensor:
+        vpis: Tensor = self._get_state_action_vpi(mu, sigma, action)
         if self.prioritized_experience_manager != None:
             self.prioritized_experience_manager.update_priorities(vpis)
         

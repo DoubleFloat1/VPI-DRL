@@ -110,7 +110,7 @@ if __name__ == "__main__":
         trials_amount: int = 1
 
         #main_dqn(gym_env, "dqn.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)
-        main_vpidqn(gym_env, "vpidqn_p.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)
+        main_vpidqn(gym_env, "vpidqn.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)
     except KeyboardInterrupt:
         time_after: datetime = datetime.datetime.now()
         delta: datetime.timedelta = time_after - time_before

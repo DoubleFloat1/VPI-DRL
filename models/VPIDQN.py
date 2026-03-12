@@ -46,6 +46,9 @@ class VPIValueModelManager:
     def get_state_q_values(self, state: Tensor) -> Tensor:
         return self.q_value_models.get_state_q_values(state)
     
+    def get_greedy_action(self, state: Tensor) -> Tuple[int, float]:
+        return self.q_value_models.get_greedy_action(state)
+    
     def get_target_q_values(self, state: Tensor) -> Tensor:
         return self.q_value_models.get_target_q_values(state)
 
@@ -161,8 +164,9 @@ class VPIDQN(DQN):
     def get_next_action(self, state: Tensor) -> int:
         state = state.to(self.device)
         if np.random.random() > self.eps:
-            q_values: Tensor = self.value_model_manager.get_state_q_values(state)
-            return q_values.argmax(dim=-1).item()
+            action, vpi = self.value_model_manager.get_greedy_action(state)
+            self.prev_state_action_vpi = vpi
+            return action
 
         vpis: Tensor = self.value_model_manager.get_actions_vpi_from_state(state)
         action: int = vpis.multinomial(1).item()
