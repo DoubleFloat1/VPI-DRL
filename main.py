@@ -79,7 +79,7 @@ def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, trainin
     vpidqn = VPIDQN(gym_env.state_size, gym_env.actions_amount, 
                     value_vpi_batch_size=32,
                     value_rand_batch_size=0,
-                    experience_replay_max_size=750000,
+                    experience_replay_max_size=7500,
                     experience_replay_state_to_uint8=gym_env.image_state,
                     value_lr=1e-5,
                     updates_to_renew_target_network=2500,
@@ -101,10 +101,10 @@ def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, trainin
 if __name__ == "__main__":
     time_before: datetime = datetime.datetime.now()
     try:
-        gym_env = Asteroid(noop_max=5, frame_skip=2)
-        #gym_env = LunarLander()
+        #gym_env = Asteroid(noop_max=5, frame_skip=2)
+        gym_env = LunarLander()
 
-        train_step_amount: int = 80000
+        train_step_amount: int = 800
         training_epochs: int = 100
         test_episode_amount: int = 100
         trials_amount: int = 1

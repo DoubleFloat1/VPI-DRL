@@ -43,7 +43,7 @@ class TrainManager:
 
     def train_model(self, model: RLModel, steps_amount: int) -> None:
         for t in range(steps_amount):
-            print(f"\rTraining: {100 * t / (steps_amount - 1):.2f}%", end="")
+            #print(f"\rTraining: {100 * t / (steps_amount - 1):.2f}%", end="")
 
             state = self.preprocessed_state
             action = model.get_next_action(state)
@@ -56,7 +56,7 @@ class TrainManager:
 
             if terminated or truncated:
                 self.reset_environment()
-        print()
+        #print()
 
 
 class TestManager:
@@ -70,7 +70,7 @@ class TestManager:
         episode_total_reward_list = []
 
         self.test_env.reset()
-        print(f"\rTesting: {episode_count} / {episodes_amount}", end="")
+        #print(f"\rTesting: {episode_count} / {episodes_amount}", end="")
         while episode_count < episodes_amount:
             state = self.test_env.get_current_state()
             state = self.gym_env.preprocess(state)
@@ -81,11 +81,11 @@ class TestManager:
                 episode_total_reward_list.append(episode_total_reward)
                 episode_total_reward = 0.0
                 episode_count += 1
-                print(f"\rTesting: {episode_count} / {episodes_amount}", end="")
+                #print(f"\rTesting: {episode_count} / {episodes_amount}", end="")
                 self.test_env.reset()
                 self.gym_env.end_episode()
         
-        print()
+        #print()
 
         return episode_total_reward_list
 

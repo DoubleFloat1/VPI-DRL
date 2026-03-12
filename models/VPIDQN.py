@@ -7,7 +7,7 @@ from torch.optim import Optimizer, Adam
 import numpy as np
 from models.rl_model import RLModel
 from models.DQN import DQN
-from models.experience_replay import ExperienceManagerInterface, ExperienceManager, PrioritizedExperienceManager, PrioritizedExperienceManager2
+from models.experience_replay import ExperienceManagerInterface, ExperienceManager, PrioritizedExperienceManager
 from models.vpi_distribution import DistributionStrategy, UniformStrategy, NormalStrategy
 
 

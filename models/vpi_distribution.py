@@ -68,7 +68,7 @@ class UniformStrategy(DistributionStrategy):
         sample_q_values, q_value_r1, q_value_r2 = self.policy_network(state)
         for i in range(self.actions_amount):
             if q_value_r1[i] > q_value_r2[i]:
-                temp = q_value_r1[i]
+                temp = q_value_r1[i].detach().clone()
                 q_value_r1[i] = q_value_r2[i]
                 q_value_r2[i] = temp
         
