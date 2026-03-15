@@ -62,7 +62,7 @@ def main():
     )
     
     plot_file("data/asteroid/dqn.txt", label="DQN", color="red")
-    plot_file("data/asteroid/vpidqn_p3.txt", label="VPIDQN", color="blue")
+    plot_file("data/asteroid/vpidqn_ppm1.txt", label="VPIDQN", color="blue")
 
     #plot_file("vpidqn.txt", label="VPIDQN", color="blue")
     #plot_file("dqn.txt", label="DQN", color="red")
