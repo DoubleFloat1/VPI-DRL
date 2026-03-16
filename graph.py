@@ -61,8 +61,8 @@ def main():
         y_axis_name="Recompensa média"
     )
     
-    plot_file("data/asteroid/dqn.txt", label="DQN", color="red")
-    plot_file("data/asteroid/vpidqn_ppm1.txt", label="VPIDQN", color="blue")
+    #plot_file("data/asteroid/dqn.txt", label="DQN", color="red")
+    plot_file("data/asteroid/vpidqn1.txt", label="VPIDQN", color="blue")
 
     #plot_file("vpidqn.txt", label="VPIDQN", color="blue")
     #plot_file("dqn.txt", label="DQN", color="red")

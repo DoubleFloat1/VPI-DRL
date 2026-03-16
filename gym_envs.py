@@ -148,7 +148,7 @@ class AtariEnv(ImageGymEnv):
         self.initialize_frame_stack()
     
     def create_environment(self) -> gym.Env:
-        return AtariWrapper(gym.make(self.gym_name, render_mode=None), 
+        return AtariWrapper(gym.make(self.gym_name, render_mode="rgb_array", frameskip=1, repeat_action_probability=0.0), 
                             noop_max=self.noop_max, 
                             frame_skip=self.frame_skip,
                             screen_size=self.screen_size,

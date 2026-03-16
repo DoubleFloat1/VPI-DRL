@@ -53,7 +53,7 @@ class ExperienceManager(ExperienceManagerInterface):
         self.next_index = (self.next_index + 1) % self.max_size
     
     def can_get_batch(self) -> bool:
-        return self.current_size >= self.batch_size
+        return self.current_size >= self.batch_size * 100 or self.current_size == self.max_size
     
     def get_batch(self) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
         indexes: Tensor = torch.tensor(np.random.randint(0, self.current_size, self.batch_size), dtype=torch.int32).to(self.device)
@@ -103,7 +103,7 @@ class PrioritizedExperienceManager(ExperienceManagerInterface):
         self.next_state_batch: Tensor = torch.zeros(self.state_batch_dimensions, dtype=self.state_dtype).to(device)
         self.episode_terminated_batch: Tensor = torch.zeros(max_size, 1, dtype=torch.uint8).to(device)
         
-        self.priority: Priority = MinHeapPriority(max_size, vpi_batch_size, rand_batch_size, device)
+        self.priority: Priority = StandardPriority(max_size, vpi_batch_size, rand_batch_size, device)
 
     def add_experience(self, state: Tensor, action: int, reward: float, next_state: Tensor, episode_terminated: bool, priority: float = 1.0) -> None:
         exp_index: int = self.priority.add_new_priority(priority**self.alpha)

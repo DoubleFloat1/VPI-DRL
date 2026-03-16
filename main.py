@@ -59,7 +59,7 @@ def main_dqn(gym_env: GymEnv, data_file: str, train_step_amount: int, training_e
     total_steps_of_eps_decay: int = round(0.125 * train_step_amount * training_epochs)
 
     dqn = DQN(gym_env.state_size, gym_env.actions_amount, 
-            experience_replay_max_size=750000,
+            experience_replay_max_size=100000,
             experience_replay_state_to_uint8=gym_env.image_state,
             updates_to_renew_target_network=2500,
             value_lr=1e-5,
@@ -79,7 +79,7 @@ def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, trainin
     vpidqn = VPIDQN(gym_env.state_size, gym_env.actions_amount, 
                     value_vpi_batch_size=32,
                     value_rand_batch_size=0,
-                    experience_replay_max_size=7500,
+                    experience_replay_max_size=5000,
                     experience_replay_state_to_uint8=gym_env.image_state,
                     value_lr=1e-5,
                     updates_to_renew_target_network=2500,
@@ -101,8 +101,8 @@ def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, trainin
 if __name__ == "__main__":
     time_before: datetime = datetime.datetime.now()
     try:
-        #gym_env = Asteroid(noop_max=5, frame_skip=2)
-        gym_env = LunarLander()
+        gym_env = Asteroid(noop_max=5, frame_skip=2)
+        #gym_env = LunarLander()
 
         train_step_amount: int = 800
         training_epochs: int = 100
