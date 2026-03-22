@@ -3,7 +3,7 @@ from torch import Tensor
 from typing import List, Tuple
 import copy
 import torch.distributions as dist
-from models.network import BayesValueModelNormal, BayesValueModelUniform, BayesModel, BayesValueModelNormal
+from models.network import BayesValueModelNormal, BayesValueModelUniform, BayesModel, BayesValueModelNormal, BayesValueModelPure
 from models.experience_replay import PrioritizedExperienceManager
 
 class DistributionStrategy:
@@ -109,7 +109,7 @@ class UniformStrategy(DistributionStrategy):
 class NormalStrategy(DistributionStrategy):
     def __init__(self, state_size: List[int], actions_amount: int, device: torch.device, pem: PrioritizedExperienceManager = None):
         super().__init__(state_size, actions_amount, device)
-        self.policy_network: BayesValueModelNormal = BayesValueModelNormal(self.state_size, self.actions_amount).to(self.device)
+        self.policy_network: BayesValueModelPure = BayesValueModelPure(self.state_size, self.actions_amount).to(self.device)
         self.policy_network.prior_to_device(self.device)
         self.target_network = copy.deepcopy(self.policy_network)
 

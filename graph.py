@@ -56,13 +56,13 @@ def plot_details(title: str = None, x_axis_name: str = None, y_axis_name: str = 
 
 def main():
     plot_details(
-        title="Recompensa média obtida pelos algoritmos",
+        title="Recompensa média obtida pelos algoritmos (Asteroids)",
         x_axis_name="Passos de treinamento",
         y_axis_name="Recompensa média"
     )
     
-    #plot_file("data/asteroid/dqn.txt", label="DQN", color="red")
-    plot_file("data/asteroid/vpidqn1.txt", label="VPIDQN", color="blue")
+    plot_file("data/space_invaders/dqn.txt", label="DQN", color="red")
+    plot_file("data/space_invaders/vpidqn3.txt", label="VPIDQN", color="blue")
 
     #plot_file("vpidqn.txt", label="VPIDQN", color="blue")
     #plot_file("dqn.txt", label="DQN", color="red")

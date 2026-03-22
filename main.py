@@ -101,8 +101,8 @@ def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, trainin
 if __name__ == "__main__":
     time_before: datetime = datetime.datetime.now()
     try:
-        gym_env = Asteroid(noop_max=5, frame_skip=2)
-        #gym_env = LunarLander()
+        #gym_env = Asteroid(noop_max=5, frame_skip=2)
+        gym_env = LunarLander()
 
         train_step_amount: int = 800
         training_epochs: int = 100

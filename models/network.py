@@ -4,7 +4,7 @@ import torch.nn as nn
 from torch.nn.parameter import Parameter
 import torch.nn.functional as F
 from torch import Tensor
-from typing import List
+from typing import List, Tuple
 
 class ValueModel(nn.Module):
 	def __init__(self, state_size: List[int], actions_amount: int):
@@ -135,6 +135,14 @@ class BayesLinear(nn.Module):
 			bias = None
             
 		return F.linear(input, weight, bias)
+	
+	def get_output_mean_and_std(self, input: Tensor) -> Tuple[Tensor, Tensor]:
+		bias_mu: Tensor = self.bias_mu if self.bias else None
+		bias_var: Tensor = torch.exp(self.bias_log_sigma)**2 if self.bias else None
+
+		mu: Tensor = F.linear(input, self.weight_mu, bias_mu)
+		var: Tensor = F.linear(input**2, torch.exp(self.weight_log_sigma)**2, bias_var)
+		return mu, torch.sqrt(var)
 
 
 
@@ -313,4 +321,57 @@ class BayesValueModelNormal(BayesModelNormal):
 				nn.Linear(512, 512),
 				nn.ReLU(),
 				BayesLinear(512, 2 * actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
+			)
+
+
+# EXPERIMENTAL MODULES
+
+class BayesModelPure(BayesModel):
+	def __init__(self):
+		super().__init__()
+		self.pre_bayes_model: nn.Sequential = None
+		self.bayes_linear: BayesLinear = None
+
+	def forward(self, x: Tensor) -> Tensor:
+		z: Tensor = self.pre_bayes_model(x)
+		y: Tensor = self.bayes_linear(z)
+		mu, sigma = self.bayes_linear.get_output_mean_and_std(z)
+		return y, mu, sigma
+	
+class BayesValueModelPure(BayesModelPure):
+	def __init__(self, state_size: List[int], actions_amount: int):
+		super().__init__()
+		self.bayes_linear = BayesLinear(512, actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
+
+		if len(state_size) == 1:
+			self.pre_bayes_model = nn.Sequential(
+				nn.Linear(state_size[0], 512),
+				nn.ReLU(),
+				nn.Linear(512, 512),
+				nn.ReLU(),
+			)
+		else:
+			height: int = state_size[1]
+			width: int = state_size[2]
+			height = height // 4 - 1
+			width = width // 4 - 1
+			height = height // 2 - 1
+			width = width // 2 - 1
+			height = height - 2
+			width = width - 2
+
+			flatten_size: int = 64 * height * width
+
+			self.pre_bayes_model = nn.Sequential(
+				nn.Conv2d(state_size[0], 32, kernel_size=8, stride=4),
+				nn.ReLU(),
+				nn.Conv2d(32, 64, kernel_size=4, stride=2),
+				nn.ReLU(),
+				nn.Conv2d(64, 64, kernel_size=3, stride=1),
+				nn.ReLU(),
+				nn.Flatten(start_dim=-3),
+				nn.Linear(flatten_size, 512),
+				nn.ReLU(),
+				nn.Linear(512, 512),
+				nn.ReLU(),
 			)

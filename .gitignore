@@ -216,8 +216,10 @@ __marimo__/
 .streamlit/secrets.toml
 
 temp.py
-playtest.py
+*test.py
+
 *.txt
 data/
 saved_models/
 test/
+images/

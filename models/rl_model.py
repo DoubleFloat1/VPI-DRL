@@ -10,7 +10,7 @@ class RLModel:
         self.actions_amount: int = actions_amount
         self.gamma: float = gamma
         self.device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        #self.device = "cpu"
+        self.device = "cpu"
 
     
     def get_next_action(self, state: List[float]) -> int:
