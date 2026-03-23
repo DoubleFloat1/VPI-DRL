@@ -1,0 +1,45 @@
+from typing import List, Tuple, Dict, Any
+
+class VPIDQNParams:
+    def __init__(self, gamma: float = 0.99, value_lr: float = 1e-5, value_kl_weight: float = 0.1, 
+                 value_vpi_batch_size: int = 16, value_rand_batch_size: int = 16, updates_to_pass_posterior: int = 512, 
+                 experience_replay_max_size: int = 4096,  experience_replay_state_to_uint8: bool = False,
+                 updates_to_renew_target_network: int = 256, initial_eps: float = 1.0, min_eps: float = 0.1, total_steps_of_eps_decay: int = 1000000,
+                 use_uniform_distribution: bool = False, alpha: float = 1.0, initial_beta: float = 1.0, total_steps_of_beta_growth: int = 1000000):
+        self.gamma: float = gamma
+        self.value_lr: float = value_lr
+        self.experience_replay_max_size: int = experience_replay_max_size
+        self.experience_replay_state_to_uint8: bool = experience_replay_state_to_uint8
+        self.updates_to_renew_target_network: int = updates_to_renew_target_network
+        self.initial_eps: float = initial_eps
+        self.min_eps: float = min_eps
+        self.total_steps_of_eps_decay: int = total_steps_of_eps_decay
+        self.value_vpi_batch_size: int = value_vpi_batch_size
+        self.value_rand_batch_size: int = value_rand_batch_size
+        self.value_kl_weight: float = value_kl_weight
+        self.updates_to_pass_posterior: int = updates_to_pass_posterior
+        self.use_uniform_distribution: bool = use_uniform_distribution
+        self.alpha: float = alpha
+        self.initial_beta: float = initial_beta
+        self.total_steps_of_beta_growth: int = total_steps_of_beta_growth
+    
+    def to_dict(self) -> Dict[str, Any]:
+        param_dict: Dict = {
+            "name": "VPIDQN",
+            "gamma": self.gamma,
+            "value_lr": self.value_lr,
+            "value_kl_weight": self.value_kl_weight,
+            "value_vpi_batch_size": self.value_vpi_batch_size,
+            "value_rand_batch_size": self.value_rand_batch_size,
+            "uptades_to_pass_posterior": self.updates_to_pass_posterior,
+            "experience_replay_max_size": self.experience_replay_max_size,
+            "updates_to_renew_target_network": self.updates_to_renew_target_network,
+            "initial_eps": self.initial_eps,
+            "min_eps": self.min_eps,
+            "total_steps_of_eps_decay": self.total_steps_of_eps_decay,
+            "use_uniform_distribution": self.use_uniform_distribution,
+            "alpha": self.alpha,
+            "initial_beta": self.initial_beta,
+            "total_steps_of_beta_growth": self.total_steps_of_beta_growth
+        }
+        return param_dict

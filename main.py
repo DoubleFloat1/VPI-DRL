@@ -1,5 +1,6 @@
 import copy
 from models.VPIDQN import VPIDQN
+from models.params import VPIDQNParams
 from models.DQN import DQN
 from models.rl_model import RLModel
 import gymnasium as gym
@@ -75,11 +76,9 @@ def main_dqn(gym_env: GymEnv, data_file: str, train_step_amount: int, training_e
 def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, training_epochs: int, test_episode_amount: int, trials_amount: int):
     total_steps_of_eps_decay: int = round(0.125 * train_step_amount * training_epochs)
     total_steps_of_beta_growth: int = train_step_amount * training_epochs
-
-    vpidqn = VPIDQN(gym_env.state_size, gym_env.actions_amount, 
-                    value_vpi_batch_size=32,
+    params: VPIDQNParams = VPIDQNParams(value_vpi_batch_size=32,
                     value_rand_batch_size=0,
-                    experience_replay_max_size=5000,
+                    experience_replay_max_size=500000,
                     experience_replay_state_to_uint8=gym_env.image_state,
                     value_lr=1e-5,
                     updates_to_renew_target_network=2500,
@@ -91,9 +90,10 @@ def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, trainin
                     use_uniform_distribution=False,
                     alpha=0.6,
                     initial_beta=0.4,
-                    total_steps_of_beta_growth=total_steps_of_beta_growth,
-                    load_model_path=None
+                    total_steps_of_beta_growth=total_steps_of_beta_growth
                     )
+
+    vpidqn = VPIDQN(gym_env.state_size, gym_env.actions_amount, params, load_model_path=None)
     
     main(gym_env, vpidqn, data_file, train_step_amount=train_step_amount, training_epochs=training_epochs, test_episode_amount=test_episode_amount,trials_amount=trials_amount)
 
@@ -101,10 +101,10 @@ def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, trainin
 if __name__ == "__main__":
     time_before: datetime = datetime.datetime.now()
     try:
-        #gym_env = Asteroid(noop_max=5, frame_skip=2)
-        gym_env = LunarLander()
+        gym_env = Asteroid(noop_max=5, frame_skip=2)
+        #gym_env = LunarLander()
 
-        train_step_amount: int = 800
+        train_step_amount: int = 80000
         training_epochs: int = 100
         test_episode_amount: int = 100
         trials_amount: int = 1

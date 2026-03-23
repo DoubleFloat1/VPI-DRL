@@ -56,7 +56,7 @@ def plot_details(title: str = None, x_axis_name: str = None, y_axis_name: str = 
 
 def main():
     plot_details(
-        title="Recompensa média obtida pelos algoritmos (Asteroids)",
+        title="Recompensa média obtida pelos algoritmos (Space Invaders)",
         x_axis_name="Passos de treinamento",
         y_axis_name="Recompensa média"
     )
