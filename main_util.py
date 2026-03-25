@@ -4,6 +4,7 @@ from gymnasium import Env
 from gym_envs import GymEnv
 from torch import Tensor
 from models.rl_model import RLModel
+import os
 
 class EnvironmentWrapper:
     def __init__(self, env: Env):
@@ -150,3 +151,7 @@ class ResultWriter:
             if i < n-1:
                 string += " "
         return string
+    
+    def delete(self) -> None:
+        if os.path.exists(self.file_name):
+            os.remove(self.file_name)

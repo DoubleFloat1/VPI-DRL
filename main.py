@@ -73,10 +73,42 @@ def main_dqn(gym_env: GymEnv, data_file: str, train_step_amount: int, training_e
     main(gym_env, dqn, data_file, train_step_amount=train_step_amount, training_epochs=training_epochs, test_episode_amount=test_episode_amount,trials_amount=trials_amount)
 
 
-def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, training_epochs: int, test_episode_amount: int, trials_amount: int):
-    total_steps_of_eps_decay: int = round(0.125 * train_step_amount * training_epochs)
-    total_steps_of_beta_growth: int = train_step_amount * training_epochs
-    params: VPIDQNParams = VPIDQNParams(value_vpi_batch_size=32,
+def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, training_epochs: int, test_episode_amount: int, trials_amount: int, params: VPIDQNParams):
+    vpidqn = VPIDQN(gym_env.state_size, gym_env.actions_amount, params, load_model_path=None)
+    
+    time_before: datetime = datetime.datetime.now()
+    try:
+        main(gym_env, vpidqn, data_file, train_step_amount=train_step_amount, training_epochs=training_epochs, test_episode_amount=test_episode_amount,trials_amount=trials_amount)
+    except KeyboardInterrupt:
+        time_after: datetime = datetime.datetime.now()
+        delta: datetime.timedelta = time_after - time_before
+        with open("interrupt_runtime.txt", "a") as file:
+            file.write(f"{time_before},{time_after},{delta.seconds}s\n")
+        
+        raise KeyboardInterrupt
+    else:
+        time_after: datetime = datetime.datetime.now()
+        delta: datetime.timedelta = time_after - time_before
+        with open("runtime.txt", "a") as file:
+            file.write(f"{time_before},{time_after},{delta.seconds}s\n")
+
+        del vpidqn
+        print("done")
+
+
+if __name__ == "__main__":
+    gym_env = SpaceInvaders(noop_max=5, frame_skip=2)
+    #gym_env = LunarLander()
+
+    train_step_amount: int = 20000
+    training_epochs: int = 100
+    test_episode_amount: int = 100
+    trials_amount: int = 1
+
+    total_steps_of_eps_decay: int = 1000000
+    total_steps_of_beta_growth: int = 8000000
+    params: VPIDQNParams = VPIDQNParams(gamma=0.99,
+                    value_vpi_batch_size=32,
                     value_rand_batch_size=0,
                     experience_replay_max_size=500000,
                     experience_replay_state_to_uint8=gym_env.image_state,
@@ -93,33 +125,5 @@ def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, trainin
                     total_steps_of_beta_growth=total_steps_of_beta_growth
                     )
 
-    vpidqn = VPIDQN(gym_env.state_size, gym_env.actions_amount, params, load_model_path=None)
-    
-    main(gym_env, vpidqn, data_file, train_step_amount=train_step_amount, training_epochs=training_epochs, test_episode_amount=test_episode_amount,trials_amount=trials_amount)
-
-
-if __name__ == "__main__":
-    time_before: datetime = datetime.datetime.now()
-    try:
-        gym_env = Asteroid(noop_max=5, frame_skip=2)
-        #gym_env = LunarLander()
-
-        train_step_amount: int = 80000
-        training_epochs: int = 100
-        test_episode_amount: int = 100
-        trials_amount: int = 1
-
-        #main_dqn(gym_env, "dqn.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)
-        main_vpidqn(gym_env, "vpidqn.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)
-    except KeyboardInterrupt:
-        time_after: datetime = datetime.datetime.now()
-        delta: datetime.timedelta = time_after - time_before
-        with open("runtime.txt", "a") as file:
-            file.write(f"{time_before},{time_after},{delta.seconds}s,Interrupted\n")
-        
-        raise KeyboardInterrupt
-    else:
-        time_after: datetime = datetime.datetime.now()
-        delta: datetime.timedelta = time_after - time_before
-        with open("runtime.txt", "a") as file:
-            file.write(f"{time_before},{time_after},{delta.seconds}s,Completed\n")
+    #main_dqn(gym_env, "dqn.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)
+    main_vpidqn(gym_env, "results/vpidqn.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount, params)

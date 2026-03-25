@@ -215,7 +215,7 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-temp.py
+temp*
 *test.py
 
 *.txt
@@ -223,3 +223,4 @@ data/
 saved_models/
 test/
 images/
+results/

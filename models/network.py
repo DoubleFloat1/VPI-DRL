@@ -120,19 +120,9 @@ class BayesLinear(nn.Module):
 			self.prior_bias_mu = self.bias_mu.detach().clone()
 			self.prior_bias_log_sigma = self.bias_log_sigma.detach().clone()
 
-	def forward(self, input):
-		if self.weight_eps is None:
-			weight = self.weight_mu + torch.exp(self.weight_log_sigma) * torch.randn_like(self.weight_log_sigma)
-		else:
-			weight = self.weight_mu + torch.exp(self.weight_log_sigma) * self.weight_eps
-        
-		if self.bias:
-			if self.bias_eps is None:
-				bias = self.bias_mu + torch.exp(self.bias_log_sigma) * torch.randn_like(self.bias_log_sigma)
-			else:
-				bias = self.bias_mu + torch.exp(self.bias_log_sigma) * self.bias_eps                
-		else:
-			bias = None
+	def forward(self, input): # Would removing some ifs make it faster?
+		weight = self.weight_mu + torch.exp(self.weight_log_sigma) * torch.randn_like(self.weight_log_sigma)
+		bias = self.bias_mu + torch.exp(self.bias_log_sigma) * torch.randn_like(self.bias_log_sigma)
             
 		return F.linear(input, weight, bias)
 	
@@ -337,6 +327,13 @@ class BayesModelPure(BayesModel):
 		y: Tensor = self.bayes_linear(z)
 		mu, sigma = self.bayes_linear.get_output_mean_and_std(z)
 		return y, mu, sigma
+	
+	def kl_loss(self) -> Tensor:
+		kl_sum = self.bayes_linear.kl_loss()
+		n = self.bayes_linear.distributions_amount()
+		
+		kl_sum = kl_sum.squeeze()
+		return kl_sum / n
 	
 class BayesValueModelPure(BayesModelPure):
 	def __init__(self, state_size: List[int], actions_amount: int):

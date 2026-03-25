@@ -87,7 +87,10 @@ class VPIValueModelManager:
 
         loss += self.q_value_models.policy_kl_loss() * self.params.value_kl_weight
 
-        self.optimizer.zero_grad()
+        #self.optimizer.zero_grad()
+        for param in self.q_value_models.policy_network.parameters():
+            param.grad = None
+
         loss.backward()
         self.optimizer.step()
 
@@ -108,6 +111,7 @@ class VPIDQN(RLModel):
         self.eps: float = self.params.initial_eps
 
         self.value_model_manager: VPIValueModelManager = self.createValueModelManager()
+        self.exception_ocurred: bool = False
 
     
     def createValueModelManager(self):
@@ -121,8 +125,18 @@ class VPIDQN(RLModel):
             return action
 
         vpis: Tensor = self.value_model_manager.get_actions_vpi_from_state(state)
-        action: int = vpis.multinomial(1).item()
-        self.prev_state_action_vpi = vpis[action].item()
+
+        try:
+            action: int = vpis.multinomial(1).item()
+            self.prev_state_action_vpi = vpis[action].item()
+        except Exception as e:
+            if not self.exception_ocurred:
+                print("exception:", e)
+                self.exception_ocurred = True
+
+            action, vpi = self.value_model_manager.get_greedy_action(state)
+            self.prev_state_action_vpi = vpi
+            
         return action
 
     def inference_next_action(self, state: Tensor) -> int:

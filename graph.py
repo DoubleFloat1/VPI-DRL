@@ -47,7 +47,7 @@ def plot_file(filepath: str, x_vals: List[float] | ndarray[float] = None, color:
     y1: ndarray[float] = mean - (std / 2)
     y2: ndarray[float] = mean + (std / 2)
     plt.fill_between(x_vals, y1, y2, alpha=0.3, color=color)
-    plt.legend()
+    plt.legend(bbox_to_anchor=(1.04, 1), loc="upper left")
 
 def plot_details(title: str = None, x_axis_name: str = None, y_axis_name: str = None, show_legend: bool = True) -> None:
     plt.title(title)
@@ -61,12 +61,13 @@ def main():
         y_axis_name="Recompensa média"
     )
     
-    plot_file("data/space_invaders/dqn.txt", label="DQN", color="red")
-    plot_file("data/space_invaders/vpidqn3.txt", label="VPIDQN", color="blue")
+    #plot_file("data/space_invaders/dqn.txt", label="DQN", color="red")
+    #plot_file("data/space_invaders/vpidqn3.txt", label="VPIDQN", color="blue")
+    for i in range(20):
+        plot_file(f"results/ll_vpidqn{i}.txt", label=f"VPIDQN{i}")
 
-    #plot_file("vpidqn.txt", label="VPIDQN", color="blue")
-    #plot_file("dqn.txt", label="DQN", color="red")
-    
+
+    plt.subplots_adjust(right=0.7)
     plt.show()
 
 def test():
