@@ -40,6 +40,7 @@ def main(gym_env: GymEnv, model: RLModel, data_file: str, create_new_data_file: 
         rewards = test_manager.test_model(model, test_episode_amount)
         mean_reward: float = sum(rewards) / len(rewards)
         mean_reward_history.append(mean_reward)
+        consecutive_prune_reports: int = 0
         for i in range(training_epochs):
             start = time.perf_counter()
             train_manager.train_model(model, train_step_amount)
@@ -47,15 +48,25 @@ def main(gym_env: GymEnv, model: RLModel, data_file: str, create_new_data_file: 
 
             rewards = test_manager.test_model(model, test_episode_amount)
             mean_reward = sum(rewards) / len(rewards)
-            print(f"Epoch {i} | {end - start:.3f}s | {mean_reward} | ", end="")
+            print(f"Epoch {i} | {end - start:.3f}s | {mean_reward}")
             mean_reward_history.append(mean_reward)
 
             if len(mean_reward_history) >= 10:
                 trial.report(sum(mean_reward_history[-10:]) / 10.0, len(mean_reward_history) - 10)
             
             if trial.should_prune():
-                writer.delete()
-                raise optuna.TrialPruned()
+                consecutive_prune_reports += 1
+                if consecutive_prune_reports >= 5:
+                    writer.delete()
+                    del model
+                    del train_manager
+                    del test_manager
+                    print("deleted model in main")
+                    raise optuna.exceptions.TrialPruned
+            else:
+                if consecutive_prune_reports > 0:
+                    print(f"false alarm. consecutive_prune_reports was at {consecutive_prune_reports}")
+                consecutive_prune_reports = 0
 
         writer.add_trial_rewards(mean_reward_history)
         writer.write()
@@ -96,6 +107,8 @@ def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, trainin
         with open("interrupt_optuna_runtime.txt", "a") as file:
             file.write(f"{time_before},{time_after},{delta.seconds}s\n")
         
+        del vpidqn
+        print("deleted model in main_vpidqn")
         raise e
     else:
         time_after: datetime = datetime.datetime.now()
@@ -114,7 +127,7 @@ def objective(trial: Trial):
     print(f"Running trial {trial.number=}")
     gamma = trial.suggest_float("gamma", 0.98, 1.0)
     experience_replay_max_size = trial.suggest_int("experience_replay_max_size", 100000, 500000)
-    value_lr = trial.suggest_float("value_lr", 1e-6, 1e-4, log=True)
+    value_lr = trial.suggest_float("value_lr", 1e-7, 1e-5, log=True)
     updates_to_renew_target_network = trial.suggest_int("updates_to_renew_target_network", 1000, 10000)
     updates_to_pass_posterior = trial.suggest_int("updates_to_pass_posterior", 1000, 10000)
     value_kl_weight = trial.suggest_float("value_kl_weight", -1.0, 1.0)
@@ -122,12 +135,12 @@ def objective(trial: Trial):
     alpha = trial.suggest_float("alpha", 0.0, 1.0)
     initial_beta = trial.suggest_float("initial_beta", 0.0, 1.0)
 
-    #gym_env = SpaceInvaders(noop_max=5, frame_skip=2)
-    gym_env = LunarLander()
+    gym_env = SpaceInvaders(noop_max=5, frame_skip=2)
+    #gym_env = LunarLander()
 
-    train_step_amount: int = 200
-    training_epochs: int = 10
-    test_episode_amount: int = 1
+    train_step_amount: int = 20000
+    training_epochs: int = 100
+    test_episode_amount: int = 100
     trials_amount: int = 1
 
     total_steps_of_eps_decay: int = 1000000
@@ -135,7 +148,7 @@ def objective(trial: Trial):
     #total_steps_of_eps_decay = round(0.125 * train_step_amount * training_epochs)
     #total_steps_of_beta_growth = train_step_amount * training_epochs
     params: VPIDQNParams = VPIDQNParams(gamma=gamma,
-                    value_vpi_batch_size=8,
+                    value_vpi_batch_size=32,
                     value_rand_batch_size=0,
                     experience_replay_max_size=experience_replay_max_size,
                     experience_replay_state_to_uint8=gym_env.image_state,
@@ -161,10 +174,10 @@ def test_hyperparameters():
     study: Study = optuna.create_study(direction='maximize', 
                                        study_name=STUDY_NAME,
                                        sampler=optuna.samplers.TPESampler(),
-                                       pruner=optuna.pruners.HyperbandPruner(),
+                                       pruner=optuna.pruners.MedianPruner(n_warmup_steps=5, n_min_trials=10),
                                        storage=JournalStorage(JournalFileBackend(file_path=f"./results/{STUDY_NAME}/{STUDY_NAME}.log")),
                                        load_if_exists=True)
-    study.optimize(objective, n_trials=2)
+    study.optimize(objective, n_trials=10)
 
     print(study.best_params)
 
