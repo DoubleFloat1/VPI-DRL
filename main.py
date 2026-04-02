@@ -60,7 +60,7 @@ def main_dqn(gym_env: GymEnv, data_file: str, train_step_amount: int, training_e
     total_steps_of_eps_decay: int = round(0.125 * train_step_amount * training_epochs)
 
     dqn = DQN(gym_env.state_size, gym_env.actions_amount, 
-            experience_replay_max_size=100000,
+            experience_replay_max_size=250000,
             experience_replay_state_to_uint8=gym_env.image_state,
             updates_to_renew_target_network=2500,
             value_lr=1e-5,
@@ -70,7 +70,24 @@ def main_dqn(gym_env: GymEnv, data_file: str, train_step_amount: int, training_e
             load_model_path=None
             )
     
-    main(gym_env, dqn, data_file, train_step_amount=train_step_amount, training_epochs=training_epochs, test_episode_amount=test_episode_amount,trials_amount=trials_amount)
+    time_before: datetime = datetime.datetime.now()
+    try:
+        main(gym_env, dqn, data_file, train_step_amount=train_step_amount, training_epochs=training_epochs, test_episode_amount=test_episode_amount,trials_amount=trials_amount)
+    except Exception as e:
+        time_after: datetime = datetime.datetime.now()
+        delta: datetime.timedelta = time_after - time_before
+        with open("interrupt_runtime.txt", "a") as file:
+            file.write(f"{time_before},{time_after},{delta.seconds}s\n")
+        
+        raise e
+    else:
+        time_after: datetime = datetime.datetime.now()
+        delta: datetime.timedelta = time_after - time_before
+        with open("runtime.txt", "a") as file:
+            file.write(f"{time_before},{time_after},{delta.seconds}s\n")
+
+        del dqn
+        print("done")
 
 
 def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, training_epochs: int, test_episode_amount: int, trials_amount: int, params: VPIDQNParams):
@@ -100,7 +117,7 @@ if __name__ == "__main__":
     gym_env = SpaceInvaders(noop_max=5, frame_skip=2)
     #gym_env = LunarLander()
 
-    train_step_amount: int = 20000
+    train_step_amount: int = 80000
     training_epochs: int = 100
     test_episode_amount: int = 100
     trials_amount: int = 1
@@ -110,20 +127,20 @@ if __name__ == "__main__":
     params: VPIDQNParams = VPIDQNParams(gamma=0.99,
                     value_vpi_batch_size=32,
                     value_rand_batch_size=0,
-                    experience_replay_max_size=500000,
+                    experience_replay_max_size=250000,
                     experience_replay_state_to_uint8=gym_env.image_state,
-                    value_lr=1e-5,
-                    updates_to_renew_target_network=2500,
-                    value_kl_weight=0.1,
-                    updates_to_pass_posterior=2500,
+                    value_lr=3e-6,
+                    updates_to_renew_target_network=1500,
+                    value_kl_weight=-0.3,
+                    updates_to_pass_posterior=8000,
                     initial_eps=1.0,
                     min_eps=0.1,
                     total_steps_of_eps_decay=total_steps_of_eps_decay,
                     use_uniform_distribution=False,
-                    alpha=0.6,
-                    initial_beta=0.4,
+                    alpha=0.4,
+                    initial_beta=0.1,
                     total_steps_of_beta_growth=total_steps_of_beta_growth
                     )
 
-    #main_dqn(gym_env, "dqn.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)
-    main_vpidqn(gym_env, "results/vpidqn.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount, params)
+    main_dqn(gym_env, "results/dqn.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)
+    #main_vpidqn(gym_env, "results/vpidqn.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount, params)

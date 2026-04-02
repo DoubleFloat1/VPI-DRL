@@ -149,7 +149,7 @@ class NormalStrategy(DistributionStrategy):
             mu: Tensor
             sigma: Tensor
             q_values, mu, sigma = self.policy_network(state)
-            return q_values.argmax(dim=-1).item()
+            return mu.argmax(dim=-1).item()
 
     def get_actions_vpi_from_state(self, state: Tensor) -> Tensor:
         mu: Tensor

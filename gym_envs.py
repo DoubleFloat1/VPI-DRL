@@ -135,11 +135,13 @@ class RaceTrack(GymEnv):
 
 
 class AtariEnv(ImageGymEnv):
-    def __init__(self, gym_name: str, actions_amount: int, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84, clip_reward: bool = True):
+    def __init__(self, gym_name: str, actions_amount: int, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84, clip_reward: bool = True,
+                 repeat_action_probability: float = 0.25):
         super().__init__()
         self.gym_name = gym_name
         self.state_size = [self.frame_stack_size * 1, screen_size, screen_size]
         self.actions_amount = actions_amount
+        self.repeat_action_probability: float = repeat_action_probability
         self.noop_max: int = noop_max
         self.frame_skip: int = frame_skip
         self.screen_size: int = screen_size
@@ -148,14 +150,19 @@ class AtariEnv(ImageGymEnv):
         self.initialize_frame_stack()
     
     def create_environment(self) -> gym.Env:
-        return AtariWrapper(gym.make(self.gym_name, render_mode="rgb_array", frameskip=1, repeat_action_probability=0.0), 
+        return AtariWrapper(gym.make(self.gym_name, render_mode="rgb_array", frameskip=1, repeat_action_probability=self.repeat_action_probability), 
                             noop_max=self.noop_max, 
                             frame_skip=self.frame_skip,
                             screen_size=self.screen_size,
                             clip_reward=self.clip_reward)
     
     def get_params_dict(self) -> Dict[str, Any]:
-        return {"gym_id": self.gym_name, "noop_max": self.noop_max, "frame_skip": self.frame_skip, "screen_size": self.screen_size, "clip_reward": self.clip_reward}
+        return {"gym_id": self.gym_name,
+                "repeat_action_probability": self.repeat_action_probability,
+                "noop_max": self.noop_max,
+                "frame_skip": self.frame_skip,
+                "screen_size": self.screen_size,
+                "clip_reward": self.clip_reward}
 
 
 

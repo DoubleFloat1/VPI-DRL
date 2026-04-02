@@ -177,6 +177,18 @@ def test_hyperparameters():
                                        pruner=optuna.pruners.MedianPruner(n_warmup_steps=5, n_min_trials=10),
                                        storage=JournalStorage(JournalFileBackend(file_path=f"./results/{STUDY_NAME}/{STUDY_NAME}.log")),
                                        load_if_exists=True)
+    
+    study.enqueue_trial({
+        "gamma": 0.99,
+        "experience_replay_max_size": 250000,
+        "value_lr": 3e-6,
+        "updates_to_renew_target_network": 1500,
+        "value_kl_weight": -0.3,
+        "updates_to_pass_posterior": 8000,
+        "min_eps": 0.1,
+        "alpha": 0.4,
+        "initial_beta": 0.1,
+    })
     study.optimize(objective, n_trials=10)
 
     print(study.best_params)

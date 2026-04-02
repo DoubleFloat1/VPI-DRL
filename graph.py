@@ -62,8 +62,8 @@ def main():
     )
     
     plot_file("data/space_invaders/dqn.txt", label="DQN", color="red")
-    #plot_file("data/space_invaders/vpidqn3.txt", label="VPIDQN", color="blue")
-    plot_file(f"results/space_invaders_vpidqn/trial35.txt", label=f"VPIDQN35")
+    plot_file("data/space_invaders/vpidqn3.txt", label="VPIDQN", color="blue")
+    #plot_file(f"results/space_invaders_vpidqn/trial35.txt", label=f"VPIDQN35")
     for i in range(20):
         pass
         #plot_file(f"results/ll_vpidqn{i}.txt", label=f"VPIDQN{i}")
