@@ -114,7 +114,7 @@ def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, trainin
 
 
 if __name__ == "__main__":
-    gym_env = SpaceInvaders(noop_max=5, frame_skip=2)
+    gym_env = SpaceInvaders(noop_max=5, frame_skip=2, continuous_actions=True, angles_amount=8, magnitudes_amount=3)
     #gym_env = LunarLander()
 
     train_step_amount: int = 80000

@@ -136,50 +136,73 @@ class RaceTrack(GymEnv):
 
 class AtariEnv(ImageGymEnv):
     def __init__(self, gym_name: str, actions_amount: int, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84, clip_reward: bool = True,
-                 repeat_action_probability: float = 0.25):
+                 repeat_action_probability: float = 0.25, continuous_actions: bool = False, angles_amount: int = 8, magnitudes_amount: int = 2):
         super().__init__()
         self.gym_name = gym_name
         self.state_size = [self.frame_stack_size * 1, screen_size, screen_size]
         self.actions_amount = actions_amount
+        if continuous_actions:
+            self.actions_amount = 2 * angles_amount * (magnitudes_amount - 1) + 2
+
         self.repeat_action_probability: float = repeat_action_probability
         self.noop_max: int = noop_max
         self.frame_skip: int = frame_skip
         self.screen_size: int = screen_size
         self.clip_reward: bool = clip_reward
 
+        self.continuous_actions: bool = continuous_actions
+        self.angles_amount: int = angles_amount
+        self.magnitudes_amount: int = magnitudes_amount
+
         self.initialize_frame_stack()
     
     def create_environment(self) -> gym.Env:
-        return AtariWrapper(gym.make(self.gym_name, render_mode="rgb_array", frameskip=1, repeat_action_probability=self.repeat_action_probability), 
+        env = gym.make(self.gym_name, render_mode="rgb_array", frameskip=1, repeat_action_probability=self.repeat_action_probability, 
+                       continuous=self.continuous_actions)
+        return AtariWrapper(env, 
                             noop_max=self.noop_max, 
                             frame_skip=self.frame_skip,
                             screen_size=self.screen_size,
-                            clip_reward=self.clip_reward)
+                            clip_reward=self.clip_reward,
+                            continuous_actions=self.continuous_actions,
+                            angles_amount=self.angles_amount,
+                            magnitudes_amount=self.magnitudes_amount)
     
     def get_params_dict(self) -> Dict[str, Any]:
         return {"gym_id": self.gym_name,
+                "state_size": self.state_size,
+                "actions_amount": self.actions_amount,
                 "repeat_action_probability": self.repeat_action_probability,
                 "noop_max": self.noop_max,
                 "frame_skip": self.frame_skip,
                 "screen_size": self.screen_size,
-                "clip_reward": self.clip_reward}
+                "clip_reward": self.clip_reward,
+                "continuous_actions": self.continuous_actions,
+                "angles_amount": self.angles_amount,
+                "magnitudes_amount": self.magnitudes_amount}
 
 
 
 class SpaceInvaders(AtariEnv):
-    def __init__(self, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84, clip_reward: bool = True):
-        super().__init__("ALE/SpaceInvaders-v5", 6, noop_max, frame_skip, screen_size, clip_reward)
+    def __init__(self, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84, clip_reward: bool = True, 
+                 repeat_action_probability: float = 0.25, continuous_actions: bool = False, angles_amount: int = 8, magnitudes_amount: int = 2):
+        super().__init__("ALE/SpaceInvaders-v5", 6, noop_max, frame_skip, screen_size, clip_reward, repeat_action_probability, 
+                         continuous_actions, angles_amount, magnitudes_amount)
         
-
 class Breakout(AtariEnv):
-    def __init__(self, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84, clip_reward: bool = True):
-        super().__init__("ALE/Breakout-v5", 4, noop_max, frame_skip, screen_size, clip_reward)
+    def __init__(self, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84, clip_reward: bool = True, 
+                 repeat_action_probability: float = 0.25, continuous_actions: bool = False, angles_amount: int = 8, magnitudes_amount: int = 2):
+        super().__init__("ALE/Breakout-v5", 4, noop_max, frame_skip, screen_size, clip_reward, repeat_action_probability, 
+                         continuous_actions, angles_amount, magnitudes_amount)
     
-
 class Asteroid(AtariEnv):
-    def __init__(self, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84, clip_reward: bool = True):
-        super().__init__("ALE/Asteroids-v5", 14, noop_max, frame_skip, screen_size, clip_reward)
+    def __init__(self, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84, clip_reward: bool = True, 
+                 repeat_action_probability: float = 0.25, continuous_actions: bool = False, angles_amount: int = 8, magnitudes_amount: int = 2):
+        super().__init__("ALE/Asteroids-v5", 14, noop_max, frame_skip, screen_size, clip_reward, repeat_action_probability, 
+                         continuous_actions, angles_amount, magnitudes_amount)
 
 class Asterisk(AtariEnv):
-    def __init__(self, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84, clip_reward: bool = True):
-        super().__init__("ALE/Asterix-v5", 9, noop_max, frame_skip, screen_size, clip_reward)
+    def __init__(self, noop_max: int = 5, frame_skip: int = 2, screen_size: int = 84, clip_reward: bool = True, 
+                 repeat_action_probability: float = 0.25, continuous_actions: bool = False, angles_amount: int = 8, magnitudes_amount: int = 2):
+        super().__init__("ALE/Asterix-v5", 9, noop_max, frame_skip, screen_size, clip_reward, repeat_action_probability, 
+                         continuous_actions, angles_amount, magnitudes_amount)

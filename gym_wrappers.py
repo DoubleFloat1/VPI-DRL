@@ -202,6 +202,32 @@ class WarpFrame(gym.ObservationWrapper):
         frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_AREA)
         return frame[:, :, None]
 
+class ContinuousActionDiscretization(gym.Wrapper):
+    def __init__(self, env: gym.Env, angles_amount: int = 8, magnitudes_amount: int = 2):
+        gym.Wrapper.__init__(self, env)
+        self.angles_amount: int = angles_amount
+        self.magnitudes_amount: int = magnitudes_amount
+        
+    
+    def step(self, action: int):
+        if action == 0:
+            return self.env.step(np.array([0.0, 0.0, 0.0], dtype=np.float32))
+        if action == 1:
+            return self.env.step(np.array([0.0, 0.0, 1.0], dtype=np.float32))
+
+        action -= 2
+        fire: int = action % 2
+        action = (action - fire) // 2
+        magnitude_index: int = action % (self.magnitudes_amount - 1)
+        action = (action - magnitude_index) // (self.magnitudes_amount - 1)
+        angle_index: int = action % self.angles_amount
+
+        magnitude: float = (magnitude_index + 1) / (self.magnitudes_amount - 1)
+        angle_proportion: float = angle_index / self.angles_amount
+        angle: float = angle_proportion * (-np.pi) + (1.0 - angle_proportion) * np.pi
+        return self.env.step(np.array([magnitude, angle, fire], dtype=np.float32))
+        
+
 
 class AtariWrapper(gym.Wrapper):
     """
@@ -233,7 +259,14 @@ class AtariWrapper(gym.Wrapper):
         screen_size: int = 84,
         terminal_on_life_loss: bool = True,
         clip_reward: bool = True,
+        continuous_actions: bool = False,
+        angles_amount: int = 8,
+        magnitudes_amount: int = 2
     ):
+        
+        if continuous_actions:
+            env = ContinuousActionDiscretization(env, angles_amount=angles_amount, magnitudes_amount=magnitudes_amount)
+
         env = NoopResetEnv(env, noop_max=noop_max)
         env = MaxAndSkipEnv(env, skip=frame_skip)
         if terminal_on_life_loss:
