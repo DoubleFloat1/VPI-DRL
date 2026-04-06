@@ -1,6 +1,7 @@
 import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
+from typing import List
 
 try:
     import cv2  # pytype:disable=import-error
@@ -202,7 +203,7 @@ class WarpFrame(gym.ObservationWrapper):
         frame = cv2.resize(frame, (self.width, self.height), interpolation=cv2.INTER_AREA)
         return frame[:, :, None]
 
-class ContinuousActionDiscretization(gym.Wrapper):
+class AtariContinuousActionDiscretization(gym.Wrapper):
     def __init__(self, env: gym.Env, angles_amount: int = 8, magnitudes_amount: int = 2):
         gym.Wrapper.__init__(self, env)
         self.angles_amount: int = angles_amount
@@ -265,7 +266,7 @@ class AtariWrapper(gym.Wrapper):
     ):
         
         if continuous_actions:
-            env = ContinuousActionDiscretization(env, angles_amount=angles_amount, magnitudes_amount=magnitudes_amount)
+            env = AtariContinuousActionDiscretization(env, angles_amount=angles_amount, magnitudes_amount=magnitudes_amount)
 
         env = NoopResetEnv(env, noop_max=noop_max)
         env = MaxAndSkipEnv(env, skip=frame_skip)
@@ -278,3 +279,25 @@ class AtariWrapper(gym.Wrapper):
             env = ClipRewardEnv(env)
 
         super(AtariWrapper, self).__init__(env)
+
+
+class ContinuousActionDiscretization(gym.Wrapper):
+    def __init__(self, env: gym.Env, actions_amount: int, range_min: float, range_max: float, discretization_factor: int):
+        gym.Wrapper.__init__(self, env)
+        self.actions_amount: int = actions_amount
+        self.range_min: float = range_min
+        self.range_max: float = range_max
+        self.discretization_factor: int = discretization_factor
+        
+    
+    def step(self, action: int):
+        continuous_action: np.ndarray = np.zeros(self.actions_amount, dtype=np.float32)
+        for i in range(self.actions_amount):
+            index: int = action % self.discretization_factor
+            action = (action - index) // self.discretization_factor
+
+            proportion: float = index / (self.discretization_factor - 1)
+            continuous_action[i] = proportion * self.range_max + (1.0 - proportion) * self.range_min
+        
+        return self.env.step(continuous_action)
+        

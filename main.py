@@ -114,16 +114,17 @@ def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, trainin
 
 
 if __name__ == "__main__":
-    gym_env = SpaceInvaders(noop_max=5, frame_skip=2, continuous_actions=True, angles_amount=8, magnitudes_amount=3)
+    gym_env = MujucoAnt(discretization_factor=3)
+    #gym_env = SpaceInvaders(noop_max=5, frame_skip=2, continuous_actions=True, angles_amount=8, magnitudes_amount=3)
     #gym_env = LunarLander()
 
-    train_step_amount: int = 80000
+    train_step_amount: int = 10000
     training_epochs: int = 100
-    test_episode_amount: int = 100
+    test_episode_amount: int = 10
     trials_amount: int = 1
 
-    total_steps_of_eps_decay: int = 1000000
-    total_steps_of_beta_growth: int = 8000000
+    total_steps_of_eps_decay: int = round(train_step_amount * training_epochs / 8)
+    total_steps_of_beta_growth: int = train_step_amount * training_epochs
     params: VPIDQNParams = VPIDQNParams(gamma=0.99,
                     value_vpi_batch_size=32,
                     value_rand_batch_size=0,
@@ -139,7 +140,8 @@ if __name__ == "__main__":
                     use_uniform_distribution=False,
                     alpha=0.4,
                     initial_beta=0.1,
-                    total_steps_of_beta_growth=total_steps_of_beta_growth
+                    total_steps_of_beta_growth=total_steps_of_beta_growth,
+                    use_heap_experience_replay=False
                     )
 
     main_dqn(gym_env, "results/dqn.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)

@@ -122,7 +122,7 @@ class MinHeapPriority(Priority):
             return exp_replaced_index
 
     def can_get_batch(self) -> bool:
-        return self.current_size >= self.batch_size * 100
+        return (self.current_size >= self.batch_size * 100) or (self.current_size == self.max_size)
 
     def get_batch_indexes(self) -> Tensor:
         heap_indexes: Tensor = self.priorities.multinomial(self.vpi_batch_size, replacement=True)

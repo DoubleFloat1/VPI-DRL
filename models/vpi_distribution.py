@@ -142,14 +142,17 @@ class NormalStrategy(DistributionStrategy):
             q_values, _, _ = self.target_network(state)
             return q_values
         
-    def get_inference_action(self, state: Tensor) -> int:
+    def get_inference_action(self, state: Tensor, use_mu: bool = True) -> int:
         with torch.no_grad():
             state = state.to(self.device)
             q_values: Tensor
             mu: Tensor
             sigma: Tensor
             q_values, mu, sigma = self.policy_network(state)
-            return mu.argmax(dim=-1).item()
+
+            if use_mu:
+                return mu.argmax(dim=-1).item()
+            return q_values.argmax(dim=-1).item()
 
     def get_actions_vpi_from_state(self, state: Tensor) -> Tensor:
         mu: Tensor

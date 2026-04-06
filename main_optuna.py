@@ -1,10 +1,10 @@
 import copy
-from models.VPIDQN import VPIDQN
+from models.optuna_VPIDQN import OptunaVPIDQN as VPIDQN
 from models.params import VPIDQNParams
 from models.DQN import DQN
 from models.rl_model import RLModel
 import gymnasium as gym
-from main_util import TrainManager, TestManager, ResultWriter
+from main_util import TrainManager, ResultWriter, EnvironmentWrapper
 import time
 import datetime
 from gym_envs import *
@@ -26,38 +26,84 @@ gym.register_envs(ale_py)
 gym.register_envs(highway_env)
 gym.register(id="custom_envs/RaceTrack-v0", entry_point=RacetrackEnv)
 
-STUDY_NAME: str = "asteroid_vpidqn"
+STUDY_NAME: str = "mujuco_ant_vpidqn"
+
+class TestManager:
+    def __init__(self, gym_env: GymEnv):
+        self.gym_env: GymEnv = gym_env
+        self.test_env: EnvironmentWrapper = EnvironmentWrapper(gym_env.create_environment())
+    
+    def test_model(self, model: VPIDQN, episodes_amount: int, use_mu: bool) -> List[float]:
+        episode_count = 0
+        episode_total_reward = 0.0
+        episode_total_reward_list = []
+
+        self.test_env.reset()
+        #print(f"\rTesting: {episode_count} / {episodes_amount}", end="")
+        while episode_count < episodes_amount:
+            state = self.test_env.get_current_state()
+            state = self.gym_env.preprocess(state)
+            action = model.inference_next_action(state, use_mu)
+            _, reward, terminated, truncated = self.test_env.step(action)
+            episode_total_reward += reward
+            if terminated or truncated:
+                episode_total_reward_list.append(episode_total_reward)
+                episode_total_reward = 0.0
+                episode_count += 1
+                #print(f"\rTesting: {episode_count} / {episodes_amount}", end="")
+                self.test_env.reset()
+                self.gym_env.end_episode()
+        
+        #print()
+
+        return episode_total_reward_list
 
 def main(gym_env: GymEnv, model: RLModel, data_file: str, create_new_data_file: bool = True, training_epochs: int = 20,
          test_episode_amount: int = 100, train_step_amount: int = 2000, trials_amount: int = 10, trial: Trial = None) -> List[float]:
-    writer = ResultWriter(data_file, gym_env, model, train_step_amount, create_new_data_file)
-    writer.write()
+    mu_writer = ResultWriter(data_file[:-4] + "_mu.txt", gym_env, model, train_step_amount, create_new_data_file)
+    q_writer = ResultWriter(data_file[:-4] + "_q.txt", gym_env, model, train_step_amount, create_new_data_file)
+    mu_writer.write()
+    q_writer.write()
     for t in range(trials_amount):
         train_manager: TrainManager = TrainManager(copy.deepcopy(gym_env))
         test_manager: TestManager = TestManager(copy.deepcopy(gym_env))
 
-        mean_reward_history = []
-        rewards = test_manager.test_model(model, test_episode_amount)
-        mean_reward: float = sum(rewards) / len(rewards)
-        mean_reward_history.append(mean_reward)
+        mu_mean_reward_history = []
+        rewards = test_manager.test_model(model, test_episode_amount, True)
+        mu_mean_reward: float = sum(rewards) / len(rewards)
+        mu_mean_reward_history.append(mu_mean_reward)
+
+        q_mean_reward_history = []
+        rewards = test_manager.test_model(model, test_episode_amount, False)
+        q_mean_reward: float = sum(rewards) / len(rewards)
+        q_mean_reward_history.append(q_mean_reward)
+        
+        print(f"Start | mu: {mu_mean_reward} | q: {q_mean_reward}")
+
         consecutive_prune_reports: int = 0
         for i in range(training_epochs):
             start = time.perf_counter()
             train_manager.train_model(model, train_step_amount)
             end = time.perf_counter()
 
-            rewards = test_manager.test_model(model, test_episode_amount)
-            mean_reward = sum(rewards) / len(rewards)
-            print(f"Epoch {i} | {end - start:.3f}s | {mean_reward}")
-            mean_reward_history.append(mean_reward)
+            rewards = test_manager.test_model(model, test_episode_amount, True)
+            mu_mean_reward = sum(rewards) / len(rewards)
+            mu_mean_reward_history.append(mu_mean_reward)
 
-            if len(mean_reward_history) >= 10:
-                trial.report(sum(mean_reward_history[-10:]) / 10.0, len(mean_reward_history) - 10)
+            rewards = test_manager.test_model(model, test_episode_amount, False)
+            q_mean_reward = sum(rewards) / len(rewards)
+            q_mean_reward_history.append(q_mean_reward)
+
+            print(f"Epoch {i} | {end - start:.3f}s | mu: {mu_mean_reward} | q: {q_mean_reward}")
+
+            if len(mu_mean_reward_history) >= 10:
+                report_value = max(sum(mu_mean_reward_history[-10:]) / 10.0, sum(q_mean_reward_history[-10:]) / 10.0)
+                trial.report(report_value, len(mu_mean_reward_history) - 10)
             
             if trial.should_prune():
                 consecutive_prune_reports += 1
                 if consecutive_prune_reports >= 5:
-                    writer.delete()
+                    mu_writer.delete()
                     del model
                     del train_manager
                     del test_manager
@@ -68,30 +114,18 @@ def main(gym_env: GymEnv, model: RLModel, data_file: str, create_new_data_file: 
                     print(f"false alarm. consecutive_prune_reports was at {consecutive_prune_reports}")
                 consecutive_prune_reports = 0
 
-        writer.add_trial_rewards(mean_reward_history)
-        writer.write()
+        mu_writer.add_trial_rewards(mu_mean_reward_history)
+        mu_writer.write()
+
+        q_writer.add_trial_rewards(q_mean_reward_history)
+        q_writer.write()
 
         if t < trials_amount - 1:
             model = model.new()
     
-    return mean_reward_history
-
-
-def main_dqn(gym_env: GymEnv, data_file: str, train_step_amount: int, training_epochs: int, test_episode_amount: int, trials_amount: int):
-    total_steps_of_eps_decay: int = round(0.125 * train_step_amount * training_epochs)
-
-    dqn = DQN(gym_env.state_size, gym_env.actions_amount, 
-            experience_replay_max_size=100000,
-            experience_replay_state_to_uint8=gym_env.image_state,
-            updates_to_renew_target_network=2500,
-            value_lr=1e-5,
-            initial_eps=1.0,
-            min_eps=0.1,
-            total_steps_of_eps_decay=total_steps_of_eps_decay,
-            load_model_path=None
-            )
-    
-    main(gym_env, dqn, data_file, train_step_amount=train_step_amount, training_epochs=training_epochs, test_episode_amount=test_episode_amount,trials_amount=trials_amount)
+    if sum(mu_mean_reward_history[-10:]) / 10.0 > sum(q_mean_reward_history[-10:]) / 10.0:
+        return mu_mean_reward_history
+    return q_mean_reward_history
 
 
 def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, training_epochs: int, test_episode_amount: int, trials_amount: int, 
@@ -124,27 +158,30 @@ def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, trainin
 
 
 def objective(trial: Trial):
-    print(f"Running trial {trial.number=}")
-    gamma = trial.suggest_float("gamma", 0.98, 1.0)
-    experience_replay_max_size = trial.suggest_int("experience_replay_max_size", 100000, 500000)
+    gamma = 0.99
+    experience_replay_max_size = 250000
     value_lr = trial.suggest_float("value_lr", 1e-7, 1e-5, log=True)
-    updates_to_renew_target_network = trial.suggest_int("updates_to_renew_target_network", 1000, 10000)
+    updates_to_renew_target_network = 2500
     updates_to_pass_posterior = trial.suggest_int("updates_to_pass_posterior", 1000, 10000)
     value_kl_weight = trial.suggest_float("value_kl_weight", -1.0, 1.0)
-    min_eps = trial.suggest_float("min_eps", 0.1, 0.5)
+    min_eps = trial.suggest_float("min_eps", 0.1, 1.0)
     alpha = trial.suggest_float("alpha", 0.0, 1.0)
     initial_beta = trial.suggest_float("initial_beta", 0.0, 1.0)
+    heap_type = trial.suggest_categorical("heap_type", ["standard", "heap"])
+    print(f"Running trial {trial.number=}. Parameters: {trial.params}")
 
-    gym_env = SpaceInvaders(noop_max=5, frame_skip=2)
+    use_heap_experience_replay: bool = True if (heap_type == "heap") else False
+
+    gym_env = MujucoAnt(discretization_factor=3)
     #gym_env = LunarLander()
 
-    train_step_amount: int = 20000
+    train_step_amount: int = 10000
     training_epochs: int = 100
-    test_episode_amount: int = 100
+    test_episode_amount: int = 10
     trials_amount: int = 1
 
-    total_steps_of_eps_decay: int = 1000000
-    total_steps_of_beta_growth: int = 8000000
+    total_steps_of_eps_decay: int = 125000
+    total_steps_of_beta_growth: int = 1000000
     #total_steps_of_eps_decay = round(0.125 * train_step_amount * training_epochs)
     #total_steps_of_beta_growth = train_step_amount * training_epochs
     params: VPIDQNParams = VPIDQNParams(gamma=gamma,
@@ -162,10 +199,10 @@ def objective(trial: Trial):
                     use_uniform_distribution=False,
                     alpha=alpha,
                     initial_beta=initial_beta,
-                    total_steps_of_beta_growth=total_steps_of_beta_growth
+                    total_steps_of_beta_growth=total_steps_of_beta_growth,
+                    use_heap_experience_replay=use_heap_experience_replay
                     )
 
-    #main_dqn(gym_env, "dqn.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)
     mean_reward_history: List[float] = main_vpidqn(gym_env, f"results/{STUDY_NAME}/trial{trial.number}.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount, params, trial)
     return sum(mean_reward_history[-10:]) / 10.0
 
@@ -179,15 +216,13 @@ def test_hyperparameters():
                                        load_if_exists=True)
     
     study.enqueue_trial({
-        "gamma": 0.99,
-        "experience_replay_max_size": 250000,
         "value_lr": 3e-6,
-        "updates_to_renew_target_network": 1500,
         "value_kl_weight": -0.3,
         "updates_to_pass_posterior": 8000,
         "min_eps": 0.1,
         "alpha": 0.4,
         "initial_beta": 0.1,
+        "heap_type": "standard"
     })
     study.optimize(objective, n_trials=10)
 

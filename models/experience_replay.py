@@ -97,7 +97,12 @@ class PrioritizedExperienceManager(ExperienceManagerInterface):
         self.next_state_batch: Tensor = torch.zeros(self.state_batch_dimensions, dtype=self.state_dtype).to(device)
         self.episode_terminated_batch: Tensor = torch.zeros(params.experience_replay_max_size, 1, dtype=torch.uint8).to(device)
         
-        self.priority: Priority = StandardPriority(params.experience_replay_max_size, params.value_vpi_batch_size, params.value_rand_batch_size, device)
+
+        self.priority: Priority 
+        if params.use_heap_experience_replay:
+            self.priority = MinHeapPriority(params.experience_replay_max_size, params.value_vpi_batch_size, params.value_rand_batch_size, device)
+        else:
+            self.priority = StandardPriority(params.experience_replay_max_size, params.value_vpi_batch_size, params.value_rand_batch_size, device)
 
         self.beta: float = self.params.initial_beta
         self.step_count: int = 0

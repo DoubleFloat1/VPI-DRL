@@ -5,7 +5,7 @@ import gymnasium as gym
 import torch
 import torchvision.transforms as T
 from torch import Tensor
-from gym_wrappers import AtariWrapper
+from gym_wrappers import AtariWrapper, ContinuousActionDiscretization
 
 class GymEnv:
     def __init__(self):
@@ -206,3 +206,40 @@ class Asterisk(AtariEnv):
                  repeat_action_probability: float = 0.25, continuous_actions: bool = False, angles_amount: int = 8, magnitudes_amount: int = 2):
         super().__init__("ALE/Asterix-v5", 9, noop_max, frame_skip, screen_size, clip_reward, repeat_action_probability, 
                          continuous_actions, angles_amount, magnitudes_amount)
+        
+
+
+
+class MujucoEnv(GymEnv):
+    def __init__(self, gym_name: str, state_size: List[int], action_dimension: int, action_range_min: float, action_range_max: float, discretization_factor: int):
+        super().__init__()
+        self.gym_name = gym_name
+        self.state_size: List[int] = state_size
+        self.action_dimension: int = action_dimension
+        self.action_range_min: float = action_range_min
+        self.action_range_max: float = action_range_max
+        self.discretization_factor: int = discretization_factor
+
+        self.actions_amount = discretization_factor**action_dimension
+    
+    def create_environment(self) -> gym.Env:
+        env = gym.make(self.gym_name, render_mode=None)
+        return ContinuousActionDiscretization(env, self.action_dimension, self.action_range_min, self.action_range_max, self.discretization_factor)
+    
+    def get_params_dict(self) -> Dict[str, Any]:
+        return {"gym_id": self.gym_name,
+                "state_size": self.state_size,
+                "action_dimension": self.action_dimension,
+                "action_range_min": self.action_range_min,
+                "action_range_max": self.action_range_max,
+                "discretization_factor": self.discretization_factor,
+                "actions_amount": self.actions_amount
+                }
+
+class MujucoAnt(MujucoEnv):
+    def __init__(self, discretization_factor: int = 4):
+        super().__init__("Ant-v5", [105], 8, -1.0, 1.0, discretization_factor)
+
+class MujucoHalfCheetah(MujucoEnv):
+    def __init__(self, discretization_factor: int = 4):
+        super().__init__("HalfCheetah-v5", [17], 6, -1.0, 1.0, discretization_factor)
