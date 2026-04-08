@@ -63,9 +63,9 @@ def main_dqn(gym_env: GymEnv, data_file: str, train_step_amount: int, training_e
             experience_replay_max_size=250000,
             experience_replay_state_to_uint8=gym_env.image_state,
             updates_to_renew_target_network=2500,
-            value_lr=1e-5,
+            value_lr=2e-6,
             initial_eps=1.0,
-            min_eps=0.1,
+            min_eps=0.8,
             total_steps_of_eps_decay=total_steps_of_eps_decay,
             load_model_path=None
             )
@@ -114,7 +114,7 @@ def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, trainin
 
 
 if __name__ == "__main__":
-    gym_env = MujucoAnt(discretization_factor=3)
+    gym_env = MujucoHalfCheetah(discretization_factor=4)
     #gym_env = SpaceInvaders(noop_max=5, frame_skip=2, continuous_actions=True, angles_amount=8, magnitudes_amount=3)
     #gym_env = LunarLander()
 
@@ -130,18 +130,18 @@ if __name__ == "__main__":
                     value_rand_batch_size=0,
                     experience_replay_max_size=250000,
                     experience_replay_state_to_uint8=gym_env.image_state,
-                    value_lr=3e-6,
+                    value_lr=2e-6,
                     updates_to_renew_target_network=1500,
-                    value_kl_weight=-0.3,
-                    updates_to_pass_posterior=8000,
+                    value_kl_weight=0.5,
+                    updates_to_pass_posterior=6000,
                     initial_eps=1.0,
-                    min_eps=0.1,
+                    min_eps=0.8,
                     total_steps_of_eps_decay=total_steps_of_eps_decay,
                     use_uniform_distribution=False,
                     alpha=0.4,
                     initial_beta=0.1,
                     total_steps_of_beta_growth=total_steps_of_beta_growth,
-                    use_heap_experience_replay=False
+                    use_heap_experience_replay=True
                     )
 
     main_dqn(gym_env, "results/dqn.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)

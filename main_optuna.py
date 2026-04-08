@@ -26,7 +26,7 @@ gym.register_envs(ale_py)
 gym.register_envs(highway_env)
 gym.register(id="custom_envs/RaceTrack-v0", entry_point=RacetrackEnv)
 
-STUDY_NAME: str = "mujuco_ant_vpidqn"
+STUDY_NAME: str = "mujuco_halfcheetah_vpidqn"
 
 class TestManager:
     def __init__(self, gym_env: GymEnv):
@@ -104,9 +104,12 @@ def main(gym_env: GymEnv, model: RLModel, data_file: str, create_new_data_file: 
                 consecutive_prune_reports += 1
                 if consecutive_prune_reports >= 5:
                     mu_writer.delete()
+                    q_writer.delete()
                     del model
                     del train_manager
                     del test_manager
+                    del mu_writer
+                    del q_writer
                     print("deleted model in main")
                     raise optuna.exceptions.TrialPruned
             else:
@@ -172,7 +175,7 @@ def objective(trial: Trial):
 
     use_heap_experience_replay: bool = True if (heap_type == "heap") else False
 
-    gym_env = MujucoAnt(discretization_factor=3)
+    gym_env = MujucoHalfCheetah(discretization_factor=4)
     #gym_env = LunarLander()
 
     train_step_amount: int = 10000
@@ -215,15 +218,6 @@ def test_hyperparameters():
                                        storage=JournalStorage(JournalFileBackend(file_path=f"./results/{STUDY_NAME}/{STUDY_NAME}.log")),
                                        load_if_exists=True)
     
-    study.enqueue_trial({
-        "value_lr": 3e-6,
-        "value_kl_weight": -0.3,
-        "updates_to_pass_posterior": 8000,
-        "min_eps": 0.1,
-        "alpha": 0.4,
-        "initial_beta": 0.1,
-        "heap_type": "standard"
-    })
     study.optimize(objective, n_trials=10)
 
     print(study.best_params)

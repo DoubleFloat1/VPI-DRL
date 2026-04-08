@@ -61,7 +61,8 @@ def main():
         y_axis_name="Recompensa média"
     )
     
-    plot_file("data/mujuco_ant/dqn.txt", label="DQN", color="red")
+    plot_file("data/mujuco_halfcheetah/dqn.txt", label="DQN", color="red")
+    plot_file("data/mujuco_halfcheetah/vpidqn.txt", label="VPIDQN", color="blue")
     #plot_file("data/space_invaders/cont/vpidqn.txt", label="VPIDQN", color="blue")
     #plot_file(f"results/space_invaders_vpidqn/trial35.txt", label=f"VPIDQN35")
     for i in range(20):

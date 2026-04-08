@@ -237,9 +237,13 @@ class MujucoEnv(GymEnv):
                 }
 
 class MujucoAnt(MujucoEnv):
-    def __init__(self, discretization_factor: int = 4):
+    def __init__(self, discretization_factor: int = 3):
         super().__init__("Ant-v5", [105], 8, -1.0, 1.0, discretization_factor)
 
 class MujucoHalfCheetah(MujucoEnv):
     def __init__(self, discretization_factor: int = 4):
         super().__init__("HalfCheetah-v5", [17], 6, -1.0, 1.0, discretization_factor)
+
+class MujucoHopper(MujucoEnv):
+    def __init__(self, discretization_factor: int = 18):
+        super().__init__("Hopper-v5", [11], 3, -1.0, 1.0, discretization_factor)
