@@ -26,7 +26,7 @@ gym.register_envs(ale_py)
 gym.register_envs(highway_env)
 gym.register(id="custom_envs/RaceTrack-v0", entry_point=RacetrackEnv)
 
-STUDY_NAME: str = "mujuco_halfcheetah_vpidqn"
+STUDY_NAME: str = "mujuco_halfcheetah_vpidqn2"
 
 class TestManager:
     def __init__(self, gym_env: GymEnv):
@@ -169,8 +169,9 @@ def objective(trial: Trial):
     value_kl_weight = trial.suggest_float("value_kl_weight", -1.0, 1.0)
     min_eps = trial.suggest_float("min_eps", 0.1, 1.0)
     alpha = trial.suggest_float("alpha", 0.0, 1.0)
-    initial_beta = trial.suggest_float("initial_beta", 0.0, 1.0)
-    heap_type = trial.suggest_categorical("heap_type", ["standard", "heap"])
+    initial_beta = 0.0
+    max_beta = trial.suggest_float("max_beta", 0.0, 1.0)
+    heap_type = "heap"
     print(f"Running trial {trial.number=}. Parameters: {trial.params}")
 
     use_heap_experience_replay: bool = True if (heap_type == "heap") else False
@@ -202,6 +203,7 @@ def objective(trial: Trial):
                     use_uniform_distribution=False,
                     alpha=alpha,
                     initial_beta=initial_beta,
+                    max_beta=max_beta,
                     total_steps_of_beta_growth=total_steps_of_beta_growth,
                     use_heap_experience_replay=use_heap_experience_replay
                     )

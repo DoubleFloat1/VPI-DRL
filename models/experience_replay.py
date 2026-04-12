@@ -105,6 +105,7 @@ class PrioritizedExperienceManager(ExperienceManagerInterface):
             self.priority = StandardPriority(params.experience_replay_max_size, params.value_vpi_batch_size, params.value_rand_batch_size, device)
 
         self.beta: float = self.params.initial_beta
+        self.max_beta: float = self.params.max_beta
         self.step_count: int = 0
 
     def add_experience(self, state: Tensor, action: int, reward: float, next_state: Tensor, episode_terminated: bool, priority: float = 1.0) -> None:
@@ -124,9 +125,9 @@ class PrioritizedExperienceManager(ExperienceManagerInterface):
             self.episode_terminated_batch[exp_index] = torch.tensor([episode_terminated], dtype=torch.float32).to(self.device)
 
         self.step_count += 1
-        if self.beta < 1.0:
+        if self.beta < self.max_beta:
             prop: float = self.step_count / self.params.total_steps_of_beta_growth
-            self.beta = prop + (1.0 - prop) * self.params.initial_beta
+            self.beta = prop * self.max_beta + (1.0 - prop) * self.params.initial_beta
         
     
     def can_get_batch(self) -> bool:

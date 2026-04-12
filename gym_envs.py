@@ -210,7 +210,7 @@ class Asterisk(AtariEnv):
 
 
 
-class MujucoEnv(GymEnv):
+class MujocoEnv(GymEnv):
     def __init__(self, gym_name: str, state_size: List[int], action_dimension: int, action_range_min: float, action_range_max: float, discretization_factor: int):
         super().__init__()
         self.gym_name = gym_name
@@ -222,8 +222,12 @@ class MujucoEnv(GymEnv):
 
         self.actions_amount = discretization_factor**action_dimension
     
-    def create_environment(self) -> gym.Env:
+    def create_mujoco_env(self) -> gym.Env:
         env = gym.make(self.gym_name, render_mode=None)
+        return env
+
+    def create_environment(self) -> gym.Env:
+        env = self.create_mujoco_env()
         return ContinuousActionDiscretization(env, self.action_dimension, self.action_range_min, self.action_range_max, self.discretization_factor)
     
     def get_params_dict(self) -> Dict[str, Any]:
@@ -236,14 +240,26 @@ class MujucoEnv(GymEnv):
                 "actions_amount": self.actions_amount
                 }
 
-class MujucoAnt(MujucoEnv):
+class MujucoAnt(MujocoEnv):
     def __init__(self, discretization_factor: int = 3):
         super().__init__("Ant-v5", [105], 8, -1.0, 1.0, discretization_factor)
+    
+    def create_mujoco_env(self) -> gym.Env:
+        env = gym.make(self.gym_name, render_mode=None, healthy_reward=0, terminate_when_unhealthy=False)
+        return env
 
-class MujucoHalfCheetah(MujucoEnv):
+class MujucoHalfCheetah(MujocoEnv):
     def __init__(self, discretization_factor: int = 4):
         super().__init__("HalfCheetah-v5", [17], 6, -1.0, 1.0, discretization_factor)
 
-class MujucoHopper(MujucoEnv):
-    def __init__(self, discretization_factor: int = 18):
+class MujucoHopper(MujocoEnv):
+    def __init__(self, discretization_factor: int = 17):
         super().__init__("Hopper-v5", [11], 3, -1.0, 1.0, discretization_factor)
+
+    def create_mujoco_env(self) -> gym.Env:
+        env = gym.make(self.gym_name, render_mode=None, healthy_reward=0, terminate_when_unhealthy=False)
+        return env
+
+class MujucoSwimmer(MujocoEnv):
+    def __init__(self, discretization_factor: int = 63):
+        super().__init__("Swimmer-v5", [8], 2, -1.0, 1.0, discretization_factor)

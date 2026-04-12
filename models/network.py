@@ -9,13 +9,14 @@ from typing import List, Tuple
 class ValueModel(nn.Module):
 	def __init__(self, state_size: List[int], actions_amount: int):
 		super().__init__()
+		hidden_layers_size: int = 1024
 		if len(state_size) == 1:
 			self.model = nn.Sequential(
-				nn.Linear(state_size[0], 512),
+				nn.Linear(state_size[0], hidden_layers_size),
 				nn.ReLU(),
-				nn.Linear(512, 512),
+				nn.Linear(hidden_layers_size, hidden_layers_size),
 				nn.ReLU(),
-				nn.Linear(512, actions_amount)
+				nn.Linear(hidden_layers_size, actions_amount)
 			)
 		elif len(state_size) == 3:
 			height: int = state_size[1]
@@ -37,11 +38,11 @@ class ValueModel(nn.Module):
 				nn.Conv2d(64, 64, kernel_size=3, stride=1),
 				nn.ReLU(),
 				nn.Flatten(start_dim=-3),
-				nn.Linear(flatten_size, 512),
+				nn.Linear(flatten_size, hidden_layers_size),
 				nn.ReLU(),
-				nn.Linear(512, 512),
+				nn.Linear(hidden_layers_size, hidden_layers_size),
 				nn.ReLU(),
-				nn.Linear(512, actions_amount)
+				nn.Linear(hidden_layers_size, actions_amount)
 			)
 	
 	def forward(self, x):
@@ -338,13 +339,14 @@ class BayesModelPure(BayesModel):
 class BayesValueModelPure(BayesModelPure):
 	def __init__(self, state_size: List[int], actions_amount: int):
 		super().__init__()
-		self.bayes_linear = BayesLinear(512, actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
+		hidden_layers_size: int = 1024
+		self.bayes_linear = BayesLinear(hidden_layers_size, actions_amount, prior_weight_sigma=0.01, prior_bias_sigma=0.01)
 
 		if len(state_size) == 1:
 			self.pre_bayes_model = nn.Sequential(
-				nn.Linear(state_size[0], 512),
+				nn.Linear(state_size[0], hidden_layers_size),
 				nn.ReLU(),
-				nn.Linear(512, 512),
+				nn.Linear(hidden_layers_size, hidden_layers_size),
 				nn.ReLU(),
 			)
 		else:
@@ -367,8 +369,8 @@ class BayesValueModelPure(BayesModelPure):
 				nn.Conv2d(64, 64, kernel_size=3, stride=1),
 				nn.ReLU(),
 				nn.Flatten(start_dim=-3),
-				nn.Linear(flatten_size, 512),
+				nn.Linear(flatten_size, hidden_layers_size),
 				nn.ReLU(),
-				nn.Linear(512, 512),
+				nn.Linear(hidden_layers_size, hidden_layers_size),
 				nn.ReLU(),
 			)
