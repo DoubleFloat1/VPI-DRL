@@ -26,7 +26,7 @@ gym.register_envs(ale_py)
 gym.register_envs(highway_env)
 gym.register(id="custom_envs/RaceTrack-v0", entry_point=RacetrackEnv)
 
-STUDY_NAME: str = "mujuco_halfcheetah_vpidqn2"
+STUDY_NAME: str = "mujuco_swimmer_vpidqn"
 
 class TestManager:
     def __init__(self, gym_env: GymEnv):
@@ -163,7 +163,7 @@ def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, trainin
 def objective(trial: Trial):
     gamma = 0.99
     experience_replay_max_size = 250000
-    value_lr = trial.suggest_float("value_lr", 1e-7, 1e-5, log=True)
+    value_lr = trial.suggest_float("value_lr", 1e-7, 3e-7, log=True)
     updates_to_renew_target_network = 2500
     updates_to_pass_posterior = trial.suggest_int("updates_to_pass_posterior", 1000, 10000)
     value_kl_weight = trial.suggest_float("value_kl_weight", -1.0, 1.0)
@@ -176,10 +176,10 @@ def objective(trial: Trial):
 
     use_heap_experience_replay: bool = True if (heap_type == "heap") else False
 
-    gym_env = MujucoHalfCheetah(discretization_factor=4)
+    gym_env = MujucoSwimmer(discretization_factor=63)
     #gym_env = LunarLander()
 
-    train_step_amount: int = 10000
+    train_step_amount: int = 5000
     training_epochs: int = 100
     test_episode_amount: int = 10
     trials_amount: int = 1

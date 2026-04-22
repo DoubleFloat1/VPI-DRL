@@ -99,8 +99,16 @@ class MinHeapPriority(Priority):
         self.last_batch_exp_indexes: Tensor = -torch.ones(self.batch_size, dtype=torch.int32)
         self.last_batch_priorities: Tensor = torch.zeros(self.batch_size, dtype=torch.float32)
         self.priority_sum: Tensor = torch.zeros(1, dtype=torch.float32)
+
+        self.added_previous_priority: bool = True
+        self.debug: int = 0
+        self.debug2: int = 0
     
     def add_new_priority(self, priority: float) -> int:
+        self.debug2 += 1
+        if self.debug2 % 10000 == 9999:
+            print("skipped experiences:", self.debug)
+
         if self.current_size < self.max_size:
             self.priorities[self.current_size + 1] = priority
             self.exp_to_heap[self.current_size] = self.current_size + 1
@@ -112,7 +120,11 @@ class MinHeapPriority(Priority):
             return self.current_size - 1
         else:
             if priority < self.priorities[1]:
+                self.added_previous_priority = False
+                self.debug += 1
                 return -1
+            else:
+                self.added_previous_priority = True
             
             exp_replaced_index: int = self.heap_to_exp[1]
             delta: float = priority - self.priorities[1]
@@ -122,7 +134,7 @@ class MinHeapPriority(Priority):
             return exp_replaced_index
 
     def can_get_batch(self) -> bool:
-        return (self.current_size >= self.batch_size * 100) or (self.current_size == self.max_size)
+        return ((self.current_size >= self.batch_size * 100) or (self.current_size == self.max_size)) and self.added_previous_priority
 
     def get_batch_indexes(self) -> Tensor:
         heap_indexes: Tensor = self.priorities.multinomial(self.vpi_batch_size, replacement=True)
