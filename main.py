@@ -1,7 +1,8 @@
 import copy
 from models.VPIDQN import VPIDQN
-from models.params import VPIDQNParams
+from models.params import VPIDQNParams, A2CParams
 from models.DQN import DQN
+from models.A2C import A2C
 from models.rl_model import RLModel
 import gymnasium as gym
 from main_util import TrainManager, TestManager, ResultWriter
@@ -20,11 +21,11 @@ gym.register(id="custom_envs/RaceTrack-v0", entry_point=RacetrackEnv)
 
 
 def main(gym_env: GymEnv, model: RLModel, data_file: str, create_new_data_file: bool = True, training_epochs: int = 20,
-         test_episode_amount: int = 100, train_step_amount: int = 2000, trials_amount: int = 10):
+         test_episode_amount: int = 100, train_step_amount: int = 2000, trials_amount: int = 1, training_envs_amount: int = 1):
     writer = ResultWriter(data_file, gym_env, model, train_step_amount, create_new_data_file)
     writer.write()
     for t in range(trials_amount):
-        train_manager: TrainManager = TrainManager(copy.deepcopy(gym_env))
+        train_manager: TrainManager = TrainManager(copy.deepcopy(gym_env), envs_amount=training_envs_amount)
         test_manager: TestManager = TestManager(copy.deepcopy(gym_env))
 
         mean_reward_history = []
@@ -55,6 +56,27 @@ def main(gym_env: GymEnv, model: RLModel, data_file: str, create_new_data_file: 
         if t < trials_amount - 1:
             model = model.new()
 
+def begin_training(gym_env: GymEnv, model: RLModel, data_file: str, train_step_amount: int, training_epochs: int, test_episode_amount: int, 
+                   trials_amount: int, training_envs_amount: int = 1):
+    time_before: datetime = datetime.datetime.now()
+    try:
+        main(gym_env, model, data_file, train_step_amount=train_step_amount, training_epochs=training_epochs, test_episode_amount=test_episode_amount,
+             trials_amount=trials_amount, training_envs_amount=training_envs_amount)
+    except Exception as e:
+        time_after: datetime = datetime.datetime.now()
+        delta: datetime.timedelta = time_after - time_before
+        with open("interrupt_runtime.txt", "a") as file:
+            file.write(f"{time_before},{time_after},{delta.seconds}s\n")
+        
+        raise e
+    else:
+        time_after: datetime = datetime.datetime.now()
+        delta: datetime.timedelta = time_after - time_before
+        with open("runtime.txt", "a") as file:
+            file.write(f"{time_before},{time_after},{delta.seconds}s\n")
+
+        del model
+        print("done")
 
 def main_dqn(gym_env: GymEnv, data_file: str, train_step_amount: int, training_epochs: int, test_episode_amount: int, trials_amount: int):
     total_steps_of_eps_decay: int = round(0.125 * train_step_amount * training_epochs)
@@ -71,61 +93,10 @@ def main_dqn(gym_env: GymEnv, data_file: str, train_step_amount: int, training_e
             load_model_path=None
             )
     
-    time_before: datetime = datetime.datetime.now()
-    try:
-        main(gym_env, dqn, data_file, train_step_amount=train_step_amount, training_epochs=training_epochs, test_episode_amount=test_episode_amount,trials_amount=trials_amount)
-    except Exception as e:
-        time_after: datetime = datetime.datetime.now()
-        delta: datetime.timedelta = time_after - time_before
-        with open("interrupt_runtime.txt", "a") as file:
-            file.write(f"{time_before},{time_after},{delta.seconds}s\n")
-        
-        raise e
-    else:
-        time_after: datetime = datetime.datetime.now()
-        delta: datetime.timedelta = time_after - time_before
-        with open("runtime.txt", "a") as file:
-            file.write(f"{time_before},{time_after},{delta.seconds}s\n")
-
-        del dqn
-        print("done")
+    begin_training(gym_env, dqn, data_file, train_step_amount, training_epochs, test_episode_amount, trials_amount)
 
 
-def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, training_epochs: int, test_episode_amount: int, trials_amount: int, params: VPIDQNParams):
-    vpidqn = VPIDQN(gym_env.state_size, gym_env.actions_amount, params, load_model_path=None)
-    
-    time_before: datetime = datetime.datetime.now()
-    try:
-        main(gym_env, vpidqn, data_file, train_step_amount=train_step_amount, training_epochs=training_epochs, test_episode_amount=test_episode_amount,trials_amount=trials_amount)
-    except KeyboardInterrupt:
-        time_after: datetime = datetime.datetime.now()
-        delta: datetime.timedelta = time_after - time_before
-        with open("interrupt_runtime.txt", "a") as file:
-            file.write(f"{time_before},{time_after},{delta.seconds}s\n")
-        
-        raise KeyboardInterrupt
-    else:
-        time_after: datetime = datetime.datetime.now()
-        delta: datetime.timedelta = time_after - time_before
-        with open("runtime.txt", "a") as file:
-            file.write(f"{time_before},{time_after},{delta.seconds}s\n")
-
-        del vpidqn
-        print("done")
-
-
-if __name__ == "__main__":
-    gym_env = MujucoHalfCheetah(discretization_factor=3)
-    #gym_env = SpaceInvaders(noop_max=5, frame_skip=2, continuous_actions=True, angles_amount=8, magnitudes_amount=3)
-    #gym_env = LunarLander()
-
-    train_step_amount: int = 10000
-    training_epochs: int = 100
-    test_episode_amount: int = 10
-    trials_amount: int = 9
-
-    total_steps_of_eps_decay: int = round(train_step_amount * training_epochs / 8)
-    total_steps_of_beta_growth: int = train_step_amount * training_epochs
+def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, training_epochs: int, test_episode_amount: int, trials_amount: int):
     params: VPIDQNParams = VPIDQNParams(gamma=0.99,
                     value_vpi_batch_size=128,
                     value_rand_batch_size=0,
@@ -146,5 +117,33 @@ if __name__ == "__main__":
                     use_heap_experience_replay=True
                     )
 
+    vpidqn = VPIDQN(gym_env.state_size, gym_env.actions_amount, params, load_model_path=None)
+    begin_training(gym_env, vpidqn, data_file, train_step_amount, training_epochs, test_episode_amount, trials_amount)
+
+def main_a2c(gym_env: GymEnv, data_file: str, train_step_amount: int, training_epochs: int, test_episode_amount: int, trials_amount: int):
+    params: A2CParams = A2CParams(
+        gamma=0.99,
+        actor_lr=3e-5,
+        critic_lr=1e-4,
+        batch_size=1024,
+        n_step_return=5,
+        envs_amount=4
+    )
+
+    a2c = A2C(gym_env.state_size, gym_env.actions_amount, params)
+    begin_training(gym_env, a2c, data_file, train_step_amount, training_epochs, test_episode_amount, trials_amount, training_envs_amount=params.envs_amount)
+
+if __name__ == "__main__":
+    gym_env = MujucoHalfCheetah(discretization_factor=4)
+
+    train_step_amount: int = 10000
+    training_epochs: int = 100
+    test_episode_amount: int = 10
+    trials_amount: int = 1
+
+    total_steps_of_eps_decay: int = round(train_step_amount * training_epochs / 8)
+    total_steps_of_beta_growth: int = train_step_amount * training_epochs
+
     #main_dqn(gym_env, "results/dqn.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)
-    main_vpidqn(gym_env, "results/vpidqn.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount, params)
+    #main_vpidqn(gym_env, "results/vpidqn.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)
+    main_a2c(gym_env, "results/a2c.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)

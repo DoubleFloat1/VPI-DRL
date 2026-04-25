@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import List
 import torch
+from torch import Tensor
 from typing import Dict, Any
 
 class RLModel:
@@ -13,13 +14,13 @@ class RLModel:
         #self.device = "cpu"
 
     
-    def get_next_action(self, state: List[float]) -> int:
+    def get_next_action(self, state: Tensor) -> int:
         raise NotImplementedError
     
-    def inference_next_action(self, state: List[float]) -> int:
+    def inference_next_action(self, state: Tensor) -> int:
         raise NotImplementedError
     
-    def improve(self, state: List[float], action: int, reward: float, next_state: List[float], episode_terminated: bool) -> None:
+    def improve(self, state: Tensor, action: int, reward: float, next_state: Tensor, terminated: bool, truncated: bool, env_id: int = 0) -> None:
         raise NotImplementedError
     
     def get_params_dict(self) -> Dict[str, Any]:

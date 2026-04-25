@@ -19,7 +19,6 @@ class VPIDQNParams:
         self.value_rand_batch_size: int = value_rand_batch_size
         self.value_kl_weight: float = value_kl_weight
         self.updates_to_pass_posterior: int = updates_to_pass_posterior
-        self.use_uniform_distribution: bool = use_uniform_distribution
         self.alpha: float = alpha
         self.initial_beta: float = initial_beta
         self.max_beta: float = max_beta
@@ -40,7 +39,6 @@ class VPIDQNParams:
             "initial_eps": self.initial_eps,
             "min_eps": self.min_eps,
             "total_steps_of_eps_decay": self.total_steps_of_eps_decay,
-            "use_uniform_distribution": self.use_uniform_distribution,
             "alpha": self.alpha,
             "initial_beta": self.initial_beta,
             "max_beta": self.max_beta,
@@ -48,3 +46,25 @@ class VPIDQNParams:
             "use_heap_experience_replay": self.use_heap_experience_replay
         }
         return param_dict
+
+class A2CParams:
+    def __init__(self, gamma: float = 0.99, actor_lr: float = 1e-4, critic_lr: float = 1e-4, batch_size: int = 1024, n_step_return: int = 5,
+                 envs_amount: int = 4):
+        self.gamma: float = gamma
+        self.actor_lr: float = actor_lr
+        self.critic_lr: float = critic_lr
+        self.batch_size: int = batch_size
+        self.n_step_return: int = n_step_return
+        self.envs_amount: int = envs_amount
+    
+    def to_dict(self) -> Dict[str, Any]:
+        params_dict: Dict = {
+            "name": "A2C",
+            "gamma": self.gamma,
+            "actor_lr": self.actor_lr,
+            "critic_lr": self.critic_lr,
+            "batch_size": self.batch_size,
+            "n_step_return": self.n_step_return,
+            "envs_amount": self.envs_amount
+        }
+        return params_dict

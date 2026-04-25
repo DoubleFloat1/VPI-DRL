@@ -5,6 +5,7 @@ from gym_envs import GymEnv
 from torch import Tensor
 from models.rl_model import RLModel
 import os
+import copy
 
 class EnvironmentWrapper:
     def __init__(self, env: Env):
@@ -31,32 +32,39 @@ class EnvironmentWrapper:
 
 # TODO: Frame stacking only works for 1 training environment
 class TrainManager:
-    def __init__(self, gym_env: GymEnv):
-        self.gym_env: GymEnv = gym_env
-        self.env: EnvironmentWrapper = EnvironmentWrapper(gym_env.create_environment())
-        self.preprocessed_state: Tensor = None
-        self.reset_environment()
+    def __init__(self, gym_env: GymEnv, envs_amount: int = 1):
+        self.envs_amount: int = envs_amount
+        self.gym_envs: List[GymEnv] = [copy.deepcopy(gym_env) for _ in range(envs_amount)]
+        self.envs: List[EnvironmentWrapper] = [EnvironmentWrapper(gym_env.create_environment()) for _ in range(envs_amount)]
+        self.preprocessed_states: List[Tensor] = [None for _ in range(envs_amount)]
+        self.reset_all_environments()
     
-    def reset_environment(self) -> None:
-        self.env.reset()
-        self.gym_env.end_episode()
-        self.preprocessed_state = self.gym_env.preprocess(self.env.get_current_state())
+    def reset_all_environments(self) -> None:
+        for i in range(self.envs_amount):
+            self.reset_environment(i)
+
+    def reset_environment(self, env_index: int) -> None:
+        self.envs[env_index].reset()
+        self.gym_envs[env_index].end_episode()
+        self.preprocessed_states[env_index] = self.gym_envs[env_index].preprocess(self.envs[env_index].get_current_state())
 
     def train_model(self, model: RLModel, steps_amount: int) -> None:
+        steps_amount = steps_amount // self.envs_amount
         for t in range(steps_amount):
-            print(f"\rTraining: {100 * t / (steps_amount - 1):.2f}%", end="")
+            for env_index in range(self.envs_amount):
+                print(f"\rTraining: {100 * t / (steps_amount - 1):.2f}%", end="")
 
-            state = self.preprocessed_state
-            action = model.get_next_action(state)
+                state: Tensor = self.preprocessed_states[env_index]
+                action: int = model.get_next_action(state)
 
-            next_state, reward, terminated, truncated = self.env.step(action)
-            next_state = self.gym_env.preprocess(next_state)
-            model.improve(state, action, reward, next_state, terminated)
+                next_state, reward, terminated, truncated = self.envs[env_index].step(action)
+                next_state = self.gym_envs[env_index].preprocess(next_state)
+                model.improve(state, action, reward, next_state, terminated, truncated, env_id=env_index)
 
-            self.preprocessed_state = next_state
+                self.preprocessed_states[env_index] = next_state
 
-            if terminated or truncated:
-                self.reset_environment()
+                if terminated or truncated:
+                    self.reset_environment(env_index)
         print()
 
 

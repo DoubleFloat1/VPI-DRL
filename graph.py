@@ -61,9 +61,11 @@ def main():
         y_axis_name="Recompensa média"
     )
     
-    #plot_file("data/mujuco_ant/dqn.txt", label="DQN", color="red")
-    #plot_file("data/mujuco_ant/vpidqn_3b.txt", label="VPIDQN", color="blue")
-    plot_file("vpidqn.txt", label="VPIDQN", color="blue")
+    plot_file("data/mujuco_halfcheetah/dqn_4.txt", label="DQN", color="red")
+    plot_file("data/mujuco_halfcheetah/vpidqn_4.txt", label="VPIDQN", color="blue")
+    #plot_file("data/mujuco_hopper/dqn_5b.txt", label="DQN", color="red")
+    #plot_file("data/mujuco_hopper/vpidqn_5b.txt", label="VPIDQN", color="blue")
+    plot_file("results/a2c.txt", label="A2C", color="green")
     #plot_file("vpidqn2.txt", label="VPIDQN2", color="red")
     for i in range(20):
         pass

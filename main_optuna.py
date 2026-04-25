@@ -162,32 +162,32 @@ def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, trainin
 
 def objective(trial: Trial):
     gamma = 0.99
-    experience_replay_max_size = 250000
-    value_lr = trial.suggest_float("value_lr", 1e-7, 3e-7, log=True)
+    experience_replay_max_size = trial.suggest_int("experience_replay_max_size", 10000, 250000, log=True)
+    value_lr = trial.suggest_float("value_lr", 1e-8, 1e-7, log=True)
     updates_to_renew_target_network = 2500
-    updates_to_pass_posterior = trial.suggest_int("updates_to_pass_posterior", 1000, 10000)
-    value_kl_weight = trial.suggest_float("value_kl_weight", -1.0, 1.0)
+    updates_to_pass_posterior = 6000
+    value_kl_weight = trial.suggest_float("value_kl_weight", 0.0, 1.0)
     min_eps = trial.suggest_float("min_eps", 0.1, 1.0)
-    alpha = trial.suggest_float("alpha", 0.0, 1.0)
-    initial_beta = 0.0
-    max_beta = trial.suggest_float("max_beta", 0.0, 1.0)
+    alpha = 0.001
+    initial_beta = 1.0
+    max_beta = 1.0
     heap_type = "heap"
     print(f"Running trial {trial.number=}. Parameters: {trial.params}")
 
     use_heap_experience_replay: bool = True if (heap_type == "heap") else False
 
-    gym_env = MujucoSwimmer(discretization_factor=63)
+    gym_env = MujucoWalker2D(discretization_factor=4, ctrl_cost_weight=1e-3, healthy_reward=1e-1)
     #gym_env = LunarLander()
 
-    train_step_amount: int = 5000
+    train_step_amount: int = 10000
     training_epochs: int = 100
     test_episode_amount: int = 10
     trials_amount: int = 1
 
-    total_steps_of_eps_decay: int = 125000
-    total_steps_of_beta_growth: int = 1000000
-    #total_steps_of_eps_decay = round(0.125 * train_step_amount * training_epochs)
-    #total_steps_of_beta_growth = train_step_amount * training_epochs
+    #total_steps_of_eps_decay: int = 125000
+    #total_steps_of_beta_growth: int = 1000000
+    total_steps_of_eps_decay = round(0.125 * train_step_amount * training_epochs)
+    total_steps_of_beta_growth = train_step_amount * training_epochs
     params: VPIDQNParams = VPIDQNParams(gamma=gamma,
                     value_vpi_batch_size=32,
                     value_rand_batch_size=0,

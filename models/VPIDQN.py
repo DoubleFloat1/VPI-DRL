@@ -8,7 +8,7 @@ import numpy as np
 from models.rl_model import RLModel
 from models.DQN import DQN
 from models.experience_replay import ExperienceManagerInterface, ExperienceManager, PrioritizedExperienceManager
-from models.vpi_distribution import DistributionStrategy, UniformStrategy, NormalStrategy
+from models.vpi_distribution import DistributionStrategy, NormalStrategy
 from models.params import VPIDQNParams
 
 
@@ -20,14 +20,12 @@ class VPIValueModelManager:
         self.actions_amount: int = actions_amount
         self.params: VPIDQNParams = params
         self.device: torch.device = device
-        self.loss_function: torch.nn.MSELoss = torch.nn.HuberLoss(reduction="none")
+        self.loss_function: torch.nn = torch.nn.MSELoss(reduction="none")
 
         self.experience_manager: PrioritizedExperienceManager = PrioritizedExperienceManager(self.state_size, self.params, device)
+
         self.q_value_models: DistributionStrategy
-        if self.params.use_uniform_distribution:
-            self.q_value_models = UniformStrategy(self.state_size, self.actions_amount, self.device)
-        else:
-            self.q_value_models = NormalStrategy(self.state_size, self.actions_amount, self.device, pem=self.experience_manager)
+        self.q_value_models = NormalStrategy(self.state_size, self.actions_amount, self.device, pem=self.experience_manager)
 
         self.optimizer: Optimizer = Adam(self.q_value_models.policy_network.parameters(), lr=self.params.value_lr)
         self.update_count: int = 0
@@ -142,8 +140,8 @@ class VPIDQN(RLModel):
     def inference_next_action(self, state: Tensor) -> int:
         return self.value_model_manager.get_inference_action(state)
     
-    def improve(self, state: Tensor, action: int, reward: float, next_state: Tensor, episode_terminated: bool) -> None:
-        self.value_model_manager.improve(state, action, reward, next_state, episode_terminated, priority=self.prev_state_action_vpi)
+    def improve(self, state: Tensor, action: int, reward: float, next_state: Tensor, terminated: bool, truncated: bool, env_id: int = 0) -> None:
+        self.value_model_manager.improve(state, action, reward, next_state, terminated, priority=self.prev_state_action_vpi)
         if self.eps > self.params.min_eps:
             self.eps_decay_step_count += 1
             proportion: float = self.eps_decay_step_count / self.params.total_steps_of_eps_decay

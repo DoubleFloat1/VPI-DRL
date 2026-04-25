@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 from torch import Tensor
-from models.network import ValueModel
+from models.network import QValueModel
 from typing import List, Tuple, Dict
 from torch.optim import Optimizer, Adam
 import numpy as np
@@ -21,11 +21,11 @@ class ValueModelManager:
         self.device: torch.device = device
         self.gamma: float = gamma
 
-        self.policy_network: ValueModel = ValueModel(self.state_size, self.actions_amount).to(self.device)
-        self.target_network: ValueModel = copy.deepcopy(self.policy_network)
+        self.policy_network: QValueModel = QValueModel(self.state_size, self.actions_amount).to(self.device)
+        self.target_network: QValueModel = copy.deepcopy(self.policy_network)
 
         self.optimizer: Optimizer = Adam(self.policy_network.parameters(), lr=learning_rate)
-        self.loss_function: torch.nn.MSELoss = torch.nn.HuberLoss()
+        self.loss_function: torch.nn.MSELoss = torch.nn.MSELoss()
 
         self.experience_manager: ExperienceManagerInterface = ExperienceManager(experience_replay_max_size, batch_size, state_size, 
                                                                                 experience_replay_state_to_uint8, device)
@@ -145,8 +145,8 @@ class DQN(RLModel):
         q_values: Tensor = self.value_model_manager.inference_get_state_q_values(state)
         return q_values.argmax(dim=-1).item()
     
-    def improve(self, state: Tensor, action: int, reward: float, next_state: Tensor, episode_terminated: bool) -> None:
-        self.value_model_manager.improve(state, action, reward, next_state, episode_terminated)
+    def improve(self, state: Tensor, action: int, reward: float, next_state: Tensor, terminated: bool, truncated: bool, env_id: int = 0) -> None:
+        self.value_model_manager.improve(state, action, reward, next_state, terminated)
         if self.eps > self.min_eps:
             self.eps_decay_step_count += 1
             proportion: float = self.eps_decay_step_count / self.total_steps_of_eps_decay
