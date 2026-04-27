@@ -5,8 +5,9 @@ class VPIDQNParams:
                  value_vpi_batch_size: int = 16, value_rand_batch_size: int = 16, updates_to_pass_posterior: int = 512, 
                  experience_replay_max_size: int = 4096,  experience_replay_state_to_uint8: bool = False,
                  updates_to_renew_target_network: int = 256, initial_eps: float = 1.0, min_eps: float = 0.1, total_steps_of_eps_decay: int = 1000000,
-                 use_uniform_distribution: bool = False, alpha: float = 1.0, initial_beta: float = 0.0, max_beta: float = 1.0, 
-                 total_steps_of_beta_growth: int = 1000000, use_heap_experience_replay: bool = False):
+                 alpha: float = 1.0, initial_beta: float = 0.0, max_beta: float = 1.0, 
+                 total_steps_of_beta_growth: int = 1000000, use_heap_experience_replay: bool = False,
+                 experience_replays_adds_per_update: int = 64, inference_use_mu: bool = True):
         self.gamma: float = gamma
         self.value_lr: float = value_lr
         self.experience_replay_max_size: int = experience_replay_max_size
@@ -24,6 +25,8 @@ class VPIDQNParams:
         self.max_beta: float = max_beta
         self.total_steps_of_beta_growth: int = total_steps_of_beta_growth
         self.use_heap_experience_replay: bool = use_heap_experience_replay
+        self.experience_replays_adds_per_update: int = experience_replays_adds_per_update
+        self.inference_use_mu: bool = inference_use_mu
     
     def to_dict(self) -> Dict[str, Any]:
         param_dict: Dict = {
@@ -43,7 +46,9 @@ class VPIDQNParams:
             "initial_beta": self.initial_beta,
             "max_beta": self.max_beta,
             "total_steps_of_beta_growth": self.total_steps_of_beta_growth,
-            "use_heap_experience_replay": self.use_heap_experience_replay
+            "use_heap_experience_replay": self.use_heap_experience_replay,
+            "experience_replays_adds_per_update": self.experience_replays_adds_per_update,
+            "inference_use_mu": self.inference_use_mu
         }
         return param_dict
 

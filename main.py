@@ -86,9 +86,9 @@ def main_dqn(gym_env: GymEnv, data_file: str, train_step_amount: int, training_e
             experience_replay_state_to_uint8=gym_env.image_state,
             updates_to_renew_target_network=2500,
             value_batch_size=128,
-            value_lr=2e-7,
+            value_lr=4e-7,
             initial_eps=1.0,
-            min_eps=0.5,
+            min_eps=0.2,
             total_steps_of_eps_decay=total_steps_of_eps_decay,
             load_model_path=None
             )
@@ -109,12 +109,13 @@ def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, trainin
                     initial_eps=1.0,
                     min_eps=0.5,
                     total_steps_of_eps_decay=total_steps_of_eps_decay,
-                    use_uniform_distribution=False,
                     alpha=0.4,
                     initial_beta=0.1,
                     max_beta=1.0,
                     total_steps_of_beta_growth=total_steps_of_beta_growth,
-                    use_heap_experience_replay=True
+                    use_heap_experience_replay=True,
+                    experience_replays_adds_per_update=64,
+                    inference_use_mu=False
                     )
 
     vpidqn = VPIDQN(gym_env.state_size, gym_env.actions_amount, params, load_model_path=None)

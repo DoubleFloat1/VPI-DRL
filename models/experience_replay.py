@@ -100,9 +100,11 @@ class PrioritizedExperienceManager(ExperienceManagerInterface):
 
         self.priority: Priority 
         if params.use_heap_experience_replay:
-            self.priority = MinHeapPriority(params.experience_replay_max_size, params.value_vpi_batch_size, params.value_rand_batch_size, device)
+            self.priority = MinHeapPriority(params.experience_replay_max_size, params.value_vpi_batch_size, params.value_rand_batch_size, 
+                                            params.experience_replays_adds_per_update, device)
         else:
-            self.priority = StandardPriority(params.experience_replay_max_size, params.value_vpi_batch_size, params.value_rand_batch_size, device)
+            self.priority = StandardPriority(params.experience_replay_max_size, params.value_vpi_batch_size, params.value_rand_batch_size, 
+                                             params.experience_replays_adds_per_update, device)
 
         self.beta: float = self.params.initial_beta
         self.max_beta: float = self.params.max_beta

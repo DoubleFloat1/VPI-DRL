@@ -29,7 +29,7 @@ class Priority:
 
 
 class StandardPriority(Priority):
-    def __init__(self, max_size: int, vpi_batch_size: int, rand_batch_size: int, device: torch.device):
+    def __init__(self, max_size: int, vpi_batch_size: int, rand_batch_size: int, adds_per_update: int, device: torch.device):
         super().__init__(max_size, vpi_batch_size, rand_batch_size, device)
 
         self.priorities: Tensor = torch.zeros(max_size, dtype=torch.float32)
@@ -39,8 +39,12 @@ class StandardPriority(Priority):
         self.last_batch_indexes: Tensor = -torch.ones(self.batch_size, dtype=torch.int32)
         self.last_batch_priorities: Tensor = torch.zeros(self.batch_size, dtype=torch.float32)
         self.priority_sum: Tensor = torch.zeros(1, dtype=torch.float32)
+
+        self.adds_per_update: int = adds_per_update
+        self.priorities_added: int = 0
     
     def add_new_priority(self, priority: float) -> int:
+        self.priorities_added += 1
         if self.current_size < self.max_size:
             self.priorities[self.current_size] = priority
             self.current_size += 1
@@ -56,7 +60,7 @@ class StandardPriority(Priority):
             return replace_index
 
     def can_get_batch(self) -> bool:
-        return (self.current_size >= self.batch_size * 100) or (self.current_size == self.max_size)
+        return ((self.current_size >= self.batch_size * 100) or (self.current_size == self.max_size)) and (self.priorities_added % self.adds_per_update == 0)
 
     def get_batch_indexes(self) -> Tensor:
         indexes1: Tensor = self.priorities.multinomial(self.vpi_batch_size, replacement=True)
@@ -88,7 +92,7 @@ class StandardPriority(Priority):
 
 
 class MinHeapPriority(Priority):
-    def __init__(self, max_size: int, vpi_batch_size: int, rand_batch_size: int, device: torch.device):
+    def __init__(self, max_size: int, vpi_batch_size: int, rand_batch_size: int, adds_per_update: int, device: torch.device):
         super().__init__(max_size, vpi_batch_size, rand_batch_size, device)
 
         self.priorities: Tensor = torch.zeros(max_size+1, dtype=torch.float32)
@@ -100,7 +104,9 @@ class MinHeapPriority(Priority):
         self.last_batch_priorities: Tensor = torch.zeros(self.batch_size, dtype=torch.float32)
         self.priority_sum: Tensor = torch.zeros(1, dtype=torch.float32)
 
+        self.adds_per_update: int = adds_per_update
         self.added_previous_priority: bool = True
+        self.priorities_added: int = 0
         self.debug: int = 0
         self.debug2: int = 0
     
@@ -117,6 +123,8 @@ class MinHeapPriority(Priority):
             self._float(self.current_size + 1)
             self.current_size += 1
             self.priority_sum += priority
+
+            self.priorities_added += 1
             return self.current_size - 1
         else:
             if priority < self.priorities[1]:
@@ -124,6 +132,7 @@ class MinHeapPriority(Priority):
                 self.debug += 1
                 return -1
             else:
+                self.priorities_added += 1
                 self.added_previous_priority = True
             
             exp_replaced_index: int = self.heap_to_exp[1]
@@ -134,7 +143,9 @@ class MinHeapPriority(Priority):
             return exp_replaced_index
 
     def can_get_batch(self) -> bool:
-        return ((self.current_size >= self.batch_size * 100) or (self.current_size == self.max_size)) and self.added_previous_priority
+        size_flag: bool = (self.current_size >= self.batch_size * 100) or (self.current_size == self.max_size)
+        previous_priority_flag: bool = (self.priorities_added % self.adds_per_update == 0) and self.added_previous_priority
+        return size_flag and previous_priority_flag
 
     def get_batch_indexes(self) -> Tensor:
         heap_indexes: Tensor = self.priorities.multinomial(self.vpi_batch_size, replacement=True)

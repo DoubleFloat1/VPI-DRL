@@ -24,8 +24,7 @@ class VPIValueModelManager:
 
         self.experience_manager: PrioritizedExperienceManager = PrioritizedExperienceManager(self.state_size, self.params, device)
 
-        self.q_value_models: DistributionStrategy
-        self.q_value_models = NormalStrategy(self.state_size, self.actions_amount, self.device, pem=self.experience_manager)
+        self.q_value_models: NormalStrategy = NormalStrategy(self.state_size, self.actions_amount, self.device, pem=self.experience_manager)
 
         self.optimizer: Optimizer = Adam(self.q_value_models.policy_network.parameters(), lr=self.params.value_lr)
         self.update_count: int = 0
@@ -39,8 +38,8 @@ class VPIValueModelManager:
     def get_target_q_values(self, state: Tensor) -> Tensor:
         return self.q_value_models.get_target_q_values(state)
 
-    def get_inference_action(self, state: Tensor) -> int:
-        return self.q_value_models.get_inference_action(state)
+    def get_inference_action(self, state: Tensor, use_mu: bool) -> int:
+        return self.q_value_models.get_inference_action(state, use_mu)
     
     def get_actions_vpi_from_state(self, state: Tensor) -> Tensor:
         return self.q_value_models.get_actions_vpi_from_state(state)
@@ -111,9 +110,11 @@ class VPIDQN(RLModel):
         self.value_model_manager: VPIValueModelManager = self.createValueModelManager()
         self.exception_ocurred: bool = False
 
-    
     def createValueModelManager(self):
         return VPIValueModelManager(self.state_size, self.actions_amount, self.params, self.device)
+
+    def set_inference_use_mu(self, use_mu: bool) -> None:
+        self.params.inference_use_mu = use_mu
 
     def get_next_action(self, state: Tensor) -> int:
         state = state.to(self.device)
@@ -138,7 +139,7 @@ class VPIDQN(RLModel):
         return action
 
     def inference_next_action(self, state: Tensor) -> int:
-        return self.value_model_manager.get_inference_action(state)
+        return self.value_model_manager.get_inference_action(state, self.params.inference_use_mu)
     
     def improve(self, state: Tensor, action: int, reward: float, next_state: Tensor, terminated: bool, truncated: bool, env_id: int = 0) -> None:
         self.value_model_manager.improve(state, action, reward, next_state, terminated, priority=self.prev_state_action_vpi)
