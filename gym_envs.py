@@ -242,17 +242,22 @@ class MujocoEnv(GymEnv):
 
 class MujucoAnt(MujocoEnv):
     def __init__(self, discretization_factor: int = 3, ctrl_cost_weight: float = 1e-3, contact_cost_weight: float = 0, healthy_reward: float = 1e-3,
-                 terminate_when_unhealthy: bool = True, action_range_min: float = -1.0, action_range_max: float = 1.0):
+                 terminate_when_unhealthy: bool = True, include_cfrc_ext_in_observation: bool = True, 
+                 action_range_min: float = -1.0, action_range_max: float = 1.0):
         self.ctrl_cost_weight: float = ctrl_cost_weight
         self.contact_cost_weight: float = contact_cost_weight
         self.healthy_reward: float = healthy_reward
         self.terminate_when_unhealthy: bool = terminate_when_unhealthy
-        super().__init__("Ant-v5", [105], 8, action_range_min, action_range_max, discretization_factor)
+        self.include_cfrc_ext_in_observation: bool = include_cfrc_ext_in_observation
+
+        state_size: int = 105 if include_cfrc_ext_in_observation else 27
+        super().__init__("Ant-v5", [state_size], 8, action_range_min, action_range_max, discretization_factor)
     
     def create_mujoco_env(self) -> gym.Env:
         env = gym.make(self.gym_name, render_mode=None,
                        ctrl_cost_weight=self.ctrl_cost_weight, contact_cost_weight=self.contact_cost_weight,
-                       healthy_reward=self.healthy_reward, terminate_when_unhealthy=self.terminate_when_unhealthy)
+                       healthy_reward=self.healthy_reward, terminate_when_unhealthy=self.terminate_when_unhealthy,
+                       include_cfrc_ext_in_observation=self.include_cfrc_ext_in_observation)
         return env
     
     def get_params_dict(self) -> Dict[str, Any]:
@@ -266,7 +271,8 @@ class MujucoAnt(MujocoEnv):
                 "ctrl_cost_weight": self.ctrl_cost_weight,
                 "contact_cost_weight": self.contact_cost_weight,
                 "healthy_reward": self.healthy_reward,
-                "terminate_when_unhealthy": self.terminate_when_unhealthy
+                "terminate_when_unhealthy": self.terminate_when_unhealthy,
+                "include_cfrc_ext_in_observation": self.include_cfrc_ext_in_observation
                 }
 
 class MujucoHalfCheetah(MujocoEnv):

@@ -55,16 +55,17 @@ def plot_details(title: str = None, x_axis_name: str = None, y_axis_name: str = 
     plt.ylabel(y_axis_name)
 
 def main():
+    plt.figure(figsize=(12, 5))
     plot_details(
-        title="Recompensa média obtida pelos algoritmos (Half Cheetah)",
-        x_axis_name="Passos de treinamento",
-        y_axis_name="Recompensa média"
+        title="Mean reward obtained by the algorithms (Walker2D)",
+        x_axis_name="Time steps trained",
+        y_axis_name="Mean reward"
     )
     
-    plot_file("data/mujuco_walker2d/dqn_4.txt", label="DQN", color="red")
-    #plot_file("data/mujuco_walker2d/vpidqn_4.txt", label="VPIDQN", color="blue")
-    plot_file("data/mujuco_walker2d/a2c_4.txt", label="A2C", color="green")
-    plot_file("vpidqn.txt", label="VPIDQN", color="blue")
+    plot_file("data/mujuco_swimmer/dqn_21b.txt", label="DDQN", color="red")
+    #plot_file("data/mujuco_swimmer/vpidqn_21b.txt", label="VPI-DQN", color="blue")
+    plot_file("data/mujuco_swimmer/a2c_21b.txt", label="A2C", color="green")
+    plot_file("vpidqn2.txt", label="VPIDQN", color="purple")
     for i in range(20):
         pass
         #plot_file(f"results/ll_vpidqn{i}.txt", label=f"VPIDQN{i}")

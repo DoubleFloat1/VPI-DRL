@@ -102,15 +102,15 @@ def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, trainin
                     value_rand_batch_size=0,
                     experience_replay_max_size=250000,
                     experience_replay_state_to_uint8=gym_env.image_state,
-                    value_lr=2e-7,
-                    updates_to_renew_target_network=2500,
+                    value_lr=1e-4,
+                    updates_to_renew_target_network=250,
                     value_kl_weight=0.5,
-                    updates_to_pass_posterior=6000,
+                    updates_to_pass_posterior=600,
                     initial_eps=1.0,
-                    min_eps=0.5,
+                    min_eps=0.2,
                     total_steps_of_eps_decay=total_steps_of_eps_decay,
-                    alpha=0.4,
-                    initial_beta=0.1,
+                    alpha=0.1,
+                    initial_beta=1.0,
                     max_beta=1.0,
                     total_steps_of_beta_growth=total_steps_of_beta_growth,
                     use_heap_experience_replay=True,
@@ -124,9 +124,9 @@ def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, trainin
 def main_a2c(gym_env: GymEnv, data_file: str, train_step_amount: int, training_epochs: int, test_episode_amount: int, trials_amount: int):
     params: A2CParams = A2CParams(
         gamma=0.99,
-        actor_lr=3e-5,
-        critic_lr=1e-4,
-        batch_size=1024,
+        actor_lr=1e-4,
+        critic_lr=2e-4,
+        batch_size=512,
         n_step_return=5,
         envs_amount=4
     )
@@ -135,7 +135,7 @@ def main_a2c(gym_env: GymEnv, data_file: str, train_step_amount: int, training_e
     begin_training(gym_env, a2c, data_file, train_step_amount, training_epochs, test_episode_amount, trials_amount, training_envs_amount=params.envs_amount)
 
 if __name__ == "__main__":
-    gym_env = MujucoHalfCheetah(discretization_factor=4)
+    gym_env = MujucoSwimmer(discretization_factor=21)
 
     train_step_amount: int = 10000
     training_epochs: int = 100
@@ -145,6 +145,6 @@ if __name__ == "__main__":
     total_steps_of_eps_decay: int = round(train_step_amount * training_epochs / 8)
     total_steps_of_beta_growth: int = train_step_amount * training_epochs
 
-    #main_dqn(gym_env, "results/dqn.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)
+    main_dqn(gym_env, "results/dqn.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)
     #main_vpidqn(gym_env, "results/vpidqn.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)
-    main_a2c(gym_env, "results/a2c.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)
+    #main_a2c(gym_env, "results/a2c.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)
