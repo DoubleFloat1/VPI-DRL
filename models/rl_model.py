@@ -4,6 +4,7 @@ from typing import List
 import torch
 from torch import Tensor
 from typing import Dict, Any
+from numpy import ndarray
 
 class RLModel:
     def __init__(self, state_size: List[int], actions_amount: int, gamma: float = 0.99):
@@ -14,10 +15,10 @@ class RLModel:
         #self.device = "cpu"
 
     
-    def get_next_action(self, state: Tensor) -> int:
+    def get_next_action(self, state: Tensor) -> int | ndarray:
         raise NotImplementedError
     
-    def inference_next_action(self, state: Tensor) -> int:
+    def inference_next_action(self, state: Tensor) -> int | ndarray:
         raise NotImplementedError
     
     def improve(self, state: Tensor, action: int, reward: float, next_state: Tensor, terminated: bool, truncated: bool, env_id: int = 0) -> None:

@@ -1,8 +1,9 @@
 import copy
 from models.VPIDQN import VPIDQN
-from models.params import VPIDQNParams, A2CParams
+from models.params import VPIDQNParams, A2CParams, DDPGParams
 from models.DQN import DQN
 from models.A2C import A2C
+from models.DDPG import DDPG
 from models.rl_model import RLModel
 import gymnasium as gym
 from main_util import TrainManager, TestManager, ResultWriter
@@ -134,17 +135,35 @@ def main_a2c(gym_env: GymEnv, data_file: str, train_step_amount: int, training_e
     a2c = A2C(gym_env.state_size, gym_env.actions_amount, params)
     begin_training(gym_env, a2c, data_file, train_step_amount, training_epochs, test_episode_amount, trials_amount, training_envs_amount=params.envs_amount)
 
-if __name__ == "__main__":
-    gym_env = MujucoSwimmer(discretization_factor=21)
+def main_ddpg(gym_env: MujocoEnv, data_file: str, train_step_amount: int, training_epochs: int, test_episode_amount: int, trials_amount: int):
+    total_steps_of_eps_decay = int(train_step_amount * training_epochs / 8)
+    uniform_start_steps = train_step_amount
+    params: DDPGParams = DDPGParams(
+        gamma=0.99,
+        q_value_lr=1e-4,
+        policy_lr=1e-4,
+        batch_size=64,
+        experience_replay_max_size=500000,
+        polyak=0.995,
+        steps_per_update=32,
+        initial_eps=0.5,
+        min_eps=0.1,
+        total_steps_of_eps_decay=total_steps_of_eps_decay,
+        uniform_start_steps=uniform_start_steps
+    )
 
-    train_step_amount: int = 10000
+    ddpg = DDPG(gym_env.state_size, gym_env.action_dimension, gym_env.action_range_min, gym_env.action_range_max, params)
+    begin_training(gym_env, ddpg, data_file, train_step_amount, training_epochs, test_episode_amount, trials_amount, training_envs_amount=1)
+
+if __name__ == "__main__":
+    gym_env = MujucoHalfCheetah(discretization_factor=None)
+
+    train_step_amount: int = 20000
     training_epochs: int = 100
     test_episode_amount: int = 10
-    trials_amount: int = 1
+    trials_amount: int = 5
 
     total_steps_of_eps_decay: int = round(train_step_amount * training_epochs / 8)
     total_steps_of_beta_growth: int = train_step_amount * training_epochs
 
-    main_dqn(gym_env, "results/dqn.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)
-    #main_vpidqn(gym_env, "results/vpidqn.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)
-    #main_a2c(gym_env, "results/a2c.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)
+    main_ddpg(gym_env, "results/ddpg.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)

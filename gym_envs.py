@@ -220,7 +220,9 @@ class MujocoEnv(GymEnv):
         self.action_range_max: float = action_range_max
         self.discretization_factor: int = discretization_factor
 
-        self.actions_amount = discretization_factor**action_dimension
+        self.actions_amount = None
+        if self.discretization_factor != None:
+            self.actions_amount = discretization_factor**action_dimension
     
     def create_mujoco_env(self) -> gym.Env:
         env = gym.make(self.gym_name, render_mode=None)
@@ -228,6 +230,8 @@ class MujocoEnv(GymEnv):
 
     def create_environment(self) -> gym.Env:
         env = self.create_mujoco_env()
+        if self.discretization_factor == None:
+            return env
         return ContinuousActionDiscretization(env, self.action_dimension, self.action_range_min, self.action_range_max, self.discretization_factor)
     
     def get_params_dict(self) -> Dict[str, Any]:
