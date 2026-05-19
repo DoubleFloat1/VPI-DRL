@@ -64,34 +64,35 @@ class DDPG(RLModel):
             self.update_models()
     
     def update_models(self) -> None:
-        experience_tensors: Tuple[Tensor, Tensor, Tensor, Tensor, Tensor] = self.experience_replay.get_batch(discrete_action=False)
-        
-        state_tensor: Tensor = experience_tensors[0]
-        action_tensor: Tensor = experience_tensors[1]
-        reward_tensor: Tensor = experience_tensors[2]
-        next_state_tensor: Tensor = experience_tensors[3]
-        episode_terminated_tensor: Tensor = experience_tensors[4]
+        for _ in range(self.params.repeats_per_update):
+            experience_tensors: Tuple[Tensor, Tensor, Tensor, Tensor, Tensor] = self.experience_replay.get_batch(discrete_action=False)
+            
+            state_tensor: Tensor = experience_tensors[0]
+            action_tensor: Tensor = experience_tensors[1]
+            reward_tensor: Tensor = experience_tensors[2]
+            next_state_tensor: Tensor = experience_tensors[3]
+            episode_terminated_tensor: Tensor = experience_tensors[4]
 
-        with torch.no_grad():
-            predicted_next_actions: Tensor = self.target_policy_model(next_state_tensor)
-            predicted_next_q_value: Tensor = self.target_q_value_model(next_state_tensor, predicted_next_actions)
-            td_target: Tensor = reward_tensor + self.params.gamma * (1 - episode_terminated_tensor) * predicted_next_q_value
-        
-        predicted_q_value: Tensor = self.q_value_model(state_tensor, action_tensor)
-        q_model_loss: Tensor = self.loss_function(predicted_q_value, td_target)
-        self.q_value_optim.zero_grad()
-        q_model_loss.backward()
-        self.q_value_optim.step()
+            with torch.no_grad():
+                predicted_next_actions: Tensor = self.target_policy_model(next_state_tensor)
+                predicted_next_q_value: Tensor = self.target_q_value_model(next_state_tensor, predicted_next_actions)
+                td_target: Tensor = reward_tensor + self.params.gamma * (1 - episode_terminated_tensor) * predicted_next_q_value
+            
+            predicted_q_value: Tensor = self.q_value_model(state_tensor, action_tensor)
+            q_model_loss: Tensor = self.loss_function(predicted_q_value, td_target)
+            self.q_value_optim.zero_grad()
+            q_model_loss.backward()
+            self.q_value_optim.step()
 
-        predicted_actions: Tensor = self.policy_model(state_tensor)
-        policy_loss: Tensor = -self.q_value_model(state_tensor, predicted_actions)
-        policy_loss = policy_loss.mean()
-        self.policy_optim.zero_grad()
-        policy_loss.backward()
-        self.policy_optim.step()
+            predicted_actions: Tensor = self.policy_model(state_tensor)
+            policy_loss: Tensor = -self.q_value_model(state_tensor, predicted_actions)
+            policy_loss = policy_loss.mean()
+            self.policy_optim.zero_grad()
+            policy_loss.backward()
+            self.policy_optim.step()
 
-        self.target_q_value_model.polyak_update(self.q_value_model, self.params.polyak)
-        self.target_policy_model.polyak_update(self.policy_model, self.params.polyak)
+            self.target_q_value_model.polyak_update(self.q_value_model, self.params.polyak)
+            self.target_policy_model.polyak_update(self.policy_model, self.params.polyak)
 
     
     def get_params_dict(self) -> Dict[str, Any]:

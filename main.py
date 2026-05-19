@@ -146,6 +146,7 @@ def main_ddpg(gym_env: MujocoEnv, data_file: str, train_step_amount: int, traini
         experience_replay_max_size=500000,
         polyak=0.995,
         steps_per_update=32,
+        repeats_per_update=8,
         initial_eps=0.5,
         min_eps=0.1,
         total_steps_of_eps_decay=total_steps_of_eps_decay,
@@ -157,11 +158,12 @@ def main_ddpg(gym_env: MujocoEnv, data_file: str, train_step_amount: int, traini
 
 if __name__ == "__main__":
     gym_env = MujucoHalfCheetah(discretization_factor=None)
+    #gym_env = MujucoAnt(discretization_factor=None, ctrl_cost_weight=0.5, healthy_reward=1.0, contact_cost_weight=5e-4)
 
     train_step_amount: int = 20000
     training_epochs: int = 100
     test_episode_amount: int = 10
-    trials_amount: int = 5
+    trials_amount: int = 3
 
     total_steps_of_eps_decay: int = round(train_step_amount * training_epochs / 8)
     total_steps_of_beta_growth: int = train_step_amount * training_epochs
