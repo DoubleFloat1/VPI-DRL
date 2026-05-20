@@ -110,3 +110,80 @@ class DDPGParams:
             "uniform_start_steps": self.uniform_start_steps
         }
         return params_dict
+
+class TD3Params:
+    def __init__(self, gamma: float = 0.99, q_value_lr: float = 1e-4, policy_lr: float = 1e-4, batch_size: int = 64, experience_replay_max_size: int = 500000,
+                 polyak: float = 0.995, steps_per_update: int = 32, repeats_per_update: int = 8, experience_replay_state_to_uint8: bool = False,
+                 initial_eps: float = 0.5, min_eps: float = 0.1, total_steps_of_eps_decay: int = 1000000, 
+                 target_noise_std: float = 0.2, noise_clip: float = 0.5, policy_delay: int = 2, uniform_start_steps: int = 10000):
+        self.gamma: float = gamma
+        self.q_value_lr: float = q_value_lr
+        self.policy_lr: float = policy_lr
+        self.batch_size: int = batch_size
+        self.experience_replay_max_size: int = experience_replay_max_size
+        self.polyak: float = polyak
+        self.steps_per_update: int = steps_per_update
+        self.repeats_per_update: int = repeats_per_update
+        self.experience_replay_state_to_uint8: bool = experience_replay_state_to_uint8
+        self.initial_eps: float = initial_eps
+        self.min_eps: float = min_eps
+        self.total_steps_of_eps_decay: int = total_steps_of_eps_decay
+        self.target_noise_std: float = target_noise_std
+        self.noise_clip: float = noise_clip
+        self.policy_delay: int = policy_delay
+        self.uniform_start_steps: int = uniform_start_steps
+    
+    def to_dict(self) -> Dict[str, Any]:
+        params_dict: Dict = {
+            "name": "TD3",
+            "gamma": self.gamma,
+            "q_value_lr": self.q_value_lr,
+            "policy_lr": self.policy_lr,
+            "batch_size": self.batch_size,
+            "experience_replay_max_size": self.experience_replay_max_size,
+            "polyak": self.polyak,
+            "steps_per_update": self.steps_per_update,
+            "repeats_per_update": self.repeats_per_update,
+            "experience_replay_state_to_uint8": self.experience_replay_state_to_uint8,
+            "initial_eps": self.initial_eps,
+            "min_eps": self.min_eps,
+            "total_steps_of_eps_decay": self.total_steps_of_eps_decay,
+            "target_noise_std": self.target_noise_std,
+            "noise_clip": self.noise_clip,
+            "policy_delay": self.policy_delay,
+            "uniform_start_steps": self.uniform_start_steps
+        }
+        return params_dict
+    
+class SACParams:
+    def __init__(self, gamma: float = 0.99, q_value_lr: float = 1e-4, policy_lr: float = 1e-4, batch_size: int = 64, experience_replay_max_size: int = 500000,
+                 polyak: float = 0.995, steps_per_update: int = 32, repeats_per_update: int = 8, experience_replay_state_to_uint8: bool = False,
+                 entropy_const: float = 0.2, uniform_start_steps: int = 10000):
+        self.gamma: float = gamma
+        self.q_value_lr: float = q_value_lr
+        self.policy_lr: float = policy_lr
+        self.batch_size: int = batch_size
+        self.experience_replay_max_size: int = experience_replay_max_size
+        self.polyak: float = polyak
+        self.steps_per_update: int = steps_per_update
+        self.repeats_per_update: int = repeats_per_update
+        self.experience_replay_state_to_uint8: bool = experience_replay_state_to_uint8
+        self.entropy_const: float = entropy_const
+        self.uniform_start_steps: int = uniform_start_steps
+    
+    def to_dict(self) -> Dict[str, Any]:
+        params_dict: Dict = {
+            "name": "SAC",
+            "gamma": self.gamma,
+            "q_value_lr": self.q_value_lr,
+            "policy_lr": self.policy_lr,
+            "batch_size": self.batch_size,
+            "experience_replay_max_size": self.experience_replay_max_size,
+            "polyak": self.polyak,
+            "steps_per_update": self.steps_per_update,
+            "repeats_per_update": self.repeats_per_update,
+            "experience_replay_state_to_uint8": self.experience_replay_state_to_uint8,
+            "entropy_const": self.entropy_const,
+            "uniform_start_steps": self.uniform_start_steps
+        }
+        return params_dict
