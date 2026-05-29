@@ -78,9 +78,10 @@ class TD3(RLModel):
             episode_terminated_tensor: Tensor = experience_tensors[4]
 
             with torch.no_grad():
-                pred_next_actions: Tensor = self.target_policy_model(next_state_tensor)
+                pred_next_actions: Tensor = self.target_policy_model(next_state_tensor) # [batch_size x action_dim]
                 norm: dist.Normal = dist.Normal(loc=0.0, scale=self.params.target_noise_std)
-                noise: Tensor = torch.clamp(norm.sample([self.actions_amount]), min=-self.params.noise_clip, max=self.params.noise_clip).to(self.device)
+                noise: Tensor = norm.sample([self.params.batch_size, self.actions_amount]) # [batch_size x action_dim]
+                noise = torch.clamp(noise, min=-self.params.noise_clip, max=self.params.noise_clip).to(self.device)
                 pred_next_actions = torch.clamp(pred_next_actions + noise, min=self.action_range_min, max=self.action_range_max)
 
                 pred_next_q_value1: Tensor = self.target_q_value_model1(next_state_tensor, pred_next_actions)
@@ -99,7 +100,7 @@ class TD3(RLModel):
             q_model_loss2.backward()
             self.q_value_optim2.step()
 
-            if repeat % self.params.policy_delay == -1 % self.params.policy_delay:
+            if repeat % self.params.policy_delay == 0:
                 predicted_actions: Tensor = self.policy_model(state_tensor)
                 policy_loss: Tensor = -self.q_value_model1(state_tensor, predicted_actions)
                 policy_loss = policy_loss.mean()
