@@ -187,3 +187,41 @@ class SACParams:
             "uniform_start_steps": self.uniform_start_steps
         }
         return params_dict
+
+
+class VPISACParams:
+    def __init__(self, gamma: float = 0.99, q_value_lr: float = 1e-4, policy_lr: float = 1e-4, vpi_lr: float = 1e-4, batch_size: int = 100,
+                 experience_replay_max_size: int = 1000000, polyak: float = 0.995, steps_per_update: int = 50, repeats_per_update: int = 50,
+                 experience_replay_state_to_uint8: bool = False, vpi_output_norms_amount: int = 1, vpi_const: float = 0.2, uniform_start_steps: int = 10000):
+        self.gamma: float = gamma
+        self.q_value_lr: float = q_value_lr
+        self.policy_lr: float = policy_lr
+        self.vpi_lr: float = vpi_lr
+        self.batch_size: int = batch_size
+        self.experience_replay_max_size: int = experience_replay_max_size
+        self.polyak: float = polyak
+        self.steps_per_update: int = steps_per_update
+        self.repeats_per_update: int = repeats_per_update
+        self.experience_replay_state_to_uint8: bool = experience_replay_state_to_uint8
+        self.vpi_output_norms_amount: int = vpi_output_norms_amount
+        self.vpi_const: float = vpi_const
+        self.uniform_start_steps: int = uniform_start_steps
+    
+    def to_dict(self) -> Dict[str, Any]:
+        params_dict: Dict = {
+            "name": "VPI-SAC",
+            "gamma": self.gamma,
+            "q_value_lr": self.q_value_lr,
+            "policy_lr": self.policy_lr,
+            "vpi_lr": self.vpi_lr,
+            "batch_size": self.batch_size,
+            "experience_replay_max_size": self.experience_replay_max_size,
+            "polyak": self.polyak,
+            "steps_per_update": self.steps_per_update,
+            "repeats_per_update": self.repeats_per_update,
+            "experience_replay_state_to_uint8": self.experience_replay_state_to_uint8,
+            "vpi_output_norms_amount": self.vpi_output_norms_amount,
+            "vpi_const": self.vpi_const,
+            "uniform_start_steps": self.uniform_start_steps
+        }
+        return params_dict

@@ -6,6 +6,7 @@ from models.A2C import A2C
 from models.DDPG import DDPG
 from models.TD3 import TD3
 from models.SAC import SAC
+from models.VPISAC import VPISAC
 from models.rl_model import RLModel
 import gymnasium as gym
 from main_util import TrainManager, TestManager, ResultWriter
@@ -100,6 +101,8 @@ def main_dqn(gym_env: GymEnv, data_file: str, train_step_amount: int, training_e
 
 
 def main_vpidqn(gym_env: GymEnv, data_file: str, train_step_amount: int, training_epochs: int, test_episode_amount: int, trials_amount: int):
+    total_steps_of_eps_decay: int = round(train_step_amount * training_epochs / 8)
+    total_steps_of_beta_growth: int = train_step_amount * training_epochs
     params: VPIDQNParams = VPIDQNParams(gamma=0.99,
                     value_vpi_batch_size=128,
                     value_rand_batch_size=0,
@@ -186,8 +189,8 @@ def main_sac(gym_env: MujocoEnv, data_file: str, train_step_amount: int, trainin
     uniform_start_steps = int(train_step_amount * training_epochs / 100)
     params: SACParams = SACParams(
         gamma=0.99,
-        q_value_lr=1e-3,
-        policy_lr=1e-3,
+        q_value_lr=1e-4,
+        policy_lr=1e-4,
         batch_size=100,
         experience_replay_max_size=1000000,
         polyak=0.995,
@@ -200,19 +203,36 @@ def main_sac(gym_env: MujocoEnv, data_file: str, train_step_amount: int, trainin
     sac = SAC(gym_env.state_size, gym_env.action_dimension, gym_env.action_range_min, gym_env.action_range_max, params)
     begin_training(gym_env, sac, data_file, train_step_amount, training_epochs, test_episode_amount, trials_amount, training_envs_amount=1)
 
+def main_vpisac(gym_env: MujocoEnv, data_file: str, train_step_amount: int, training_epochs: int, test_episode_amount: int, trials_amount: int):
+    params: VPISACParams = VPISACParams(
+        gamma=0.99,
+        q_value_lr=1e-4,
+        policy_lr=1e-4,
+        vpi_lr=1e-4,
+        batch_size=100,
+        experience_replay_max_size=1000000,
+        polyak=0.995,
+        steps_per_update=50,
+        repeats_per_update=50,
+        vpi_output_norms_amount=1,
+        vpi_const=0.2,
+        uniform_start_steps=10000
+    )
+
+    vpisac = VPISAC(gym_env.state_size, gym_env.action_dimension, gym_env.action_range_min, gym_env.action_range_max, params)
+    begin_training(gym_env, vpisac, data_file, train_step_amount, training_epochs, test_episode_amount, trials_amount, training_envs_amount=1)
+
 if __name__ == "__main__":
-    #gym_env = MujucoHalfCheetah(discretization_factor=None)
+    gym_env = MujucoHalfCheetah(discretization_factor=None)
     #gym_env = MujucoAnt(discretization_factor=None, ctrl_cost_weight=0.5, healthy_reward=1.0, contact_cost_weight=5e-4)
-    gym_env = MujucoWalker2D(discretization_factor=None, healthy_reward=1.0, ctrl_cost_weight=1e-3, terminate_when_unhealthy=True)
+    #gym_env = MujucoWalker2D(discretization_factor=None, healthy_reward=1.0, ctrl_cost_weight=1e-3, terminate_when_unhealthy=True)
 
     train_step_amount: int = 10000
     training_epochs: int = 200
     test_episode_amount: int = 10
     trials_amount: int = 3
 
-    total_steps_of_eps_decay: int = round(train_step_amount * training_epochs / 8)
-    total_steps_of_beta_growth: int = train_step_amount * training_epochs
-
     #main_ddpg(gym_env, "results/ddpg.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)
-    main_td3(gym_env, "results/td3.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)
-    #main_sac(gym_env, "results/sac.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)
+    #main_td3(gym_env, "results/td3.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)
+    main_sac(gym_env, "results/sac.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)
+    #main_vpisac(gym_env, "results/vpisac.txt", train_step_amount, training_epochs, test_episode_amount, trials_amount)
