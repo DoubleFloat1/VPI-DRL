@@ -72,14 +72,14 @@ class SAC(RLModel):
         mu, sigma = self.policy_model(state)
 
         sample: Tensor = self.multi_normal.sample([self.params.batch_size]).to(self.device)
-        action: Tensor = torch.sigmoid(mu + sigma * sample)
-        action = action * (self.action_range_max - self.action_range_min) + self.action_range_min
+        norm_action: Tensor = mu + sigma * sample
+        action = torch.sigmoid(norm_action) * (self.action_range_max - self.action_range_min) + self.action_range_min
 
         norm: dist.Normal = dist.Normal(loc=mu, scale=sigma)
         delta: float = 1e-4 # To avoid exploding the value by divisions close to 0
-        u: Tensor = torch.log((action - self.action_range_min + delta) / (self.action_range_max - action + delta))
+        u: Tensor = norm_action
         derivative: Tensor = (self.action_range_max - self.action_range_min) / ((action - self.action_range_min) * (self.action_range_max - action) + delta)
-        log_prob: Tensor = torch.log(torch.exp(norm.log_prob(u)) + delta) + torch.log(derivative) # [batch_size x action_dim]
+        log_prob: Tensor = torch.clamp(norm.log_prob(u), min=np.log(delta)) + torch.log(derivative) # [batch_size x action_dim]
         log_prob = log_prob.sum(dim=-1, keepdim=True) # [batch_size x 1]
 
         return action, log_prob
