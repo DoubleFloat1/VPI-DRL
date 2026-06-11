@@ -66,7 +66,12 @@ class SAC(RLModel):
             action = action * (self.action_range_max - self.action_range_min) + self.action_range_min
             return action.cpu().numpy()
     
-    def _policy_action_and_log_prob(self, state: Tensor) -> Tuple[Tensor, Tensor]:
+    def _normal_prob(self, tensor: Tensor, loc: Tensor, scale: Tensor) -> Tensor:
+        exponent: Tensor = -0.5 * ((tensor - loc) / scale)**2
+        frac: Tensor = 1.0 / (scale * np.sqrt(2 * np.pi))
+        return frac * exponent.exp()
+
+    def _policy_action_and_log_prob(self, state: Tensor, delta: float = 1e-5) -> Tuple[Tensor, Tensor]:
         mu: Tensor
         sigma: Tensor
         mu, sigma = self.policy_model(state)
@@ -75,11 +80,9 @@ class SAC(RLModel):
         norm_action: Tensor = mu + sigma * sample
         action = torch.sigmoid(norm_action) * (self.action_range_max - self.action_range_min) + self.action_range_min
 
-        norm: dist.Normal = dist.Normal(loc=mu, scale=sigma)
-        delta: float = 1e-4 # To avoid exploding the value by divisions close to 0
         u: Tensor = norm_action
         derivative: Tensor = (self.action_range_max - self.action_range_min) / ((action - self.action_range_min) * (self.action_range_max - action) + delta)
-        log_prob: Tensor = torch.clamp(norm.log_prob(u), min=np.log(delta)) + torch.log(derivative) # [batch_size x action_dim]
+        log_prob: Tensor = torch.log(self._normal_prob(u, mu, sigma) + delta) + torch.log(derivative) # [batch_size x action_dim]
         log_prob = log_prob.sum(dim=-1, keepdim=True) # [batch_size x 1]
 
         return action, log_prob

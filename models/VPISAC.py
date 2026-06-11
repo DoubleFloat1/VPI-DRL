@@ -70,7 +70,7 @@ class VPISAC(RLModel):
             action = action * (self.action_range_max - self.action_range_min) + self.action_range_min
             return action.cpu().numpy()
     
-    def normal_prob(self, tensor: Tensor, loc: Tensor, scale: Tensor) -> Tensor:
+    def _normal_prob(self, tensor: Tensor, loc: Tensor, scale: Tensor) -> Tensor:
         exponent: Tensor = -0.5 * ((tensor - loc) / scale)**2
         frac: Tensor = 1.0 / (scale * np.sqrt(2 * np.pi))
         return frac * exponent.exp()
@@ -81,7 +81,7 @@ class VPISAC(RLModel):
         mu, sigma = model(state, action)
         return mu + sigma * self.normal.sample(sigma.size()).to(self.device)
     
-    def _policy_action_and_log_prob(self, state: Tensor, delta: float = 1e-4) -> Tuple[Tensor, Tensor, Tensor]:
+    def _policy_action_and_log_prob(self, state: Tensor, delta: float = 1e-5) -> Tuple[Tensor, Tensor, Tensor]:
         # Policy action
         mu: Tensor # [batch_size x action_dim]
         sigma: Tensor # [batch_size x action_dim]
@@ -92,27 +92,26 @@ class VPISAC(RLModel):
         action = torch.sigmoid(norm_action) * (self.action_range_max - self.action_range_min) + self.action_range_min
 
         # Policy log prob
-        norm: dist.Normal = dist.Normal(loc=mu, scale=sigma)
         u: Tensor = norm_action
         derivative: Tensor = (self.action_range_max - self.action_range_min) / ((action - self.action_range_min) * (self.action_range_max - action) + delta)
-        policy_log_prob: Tensor = torch.log(torch.exp(norm.log_prob(u)) + delta) + torch.log(derivative) # [batch_size x action_dim]
+        policy_log_prob: Tensor = torch.log(self._normal_prob(u, mu, sigma) + delta) + torch.log(derivative) # [batch_size x action_dim]
         policy_log_prob = policy_log_prob.sum(dim=-1, keepdim=True) # [batch_size x 1]
 
         # VPI distribution log prob
         all_mu, all_sigma = self.vpi_dist_model(state)
         mu_stack: Tensor = torch.stack(torch.chunk(all_mu, self.params.vpi_output_norms_amount, dim=-1)) # [norm_amount x batch_size x action_dim]
         sigma_stack: Tensor = torch.stack(torch.chunk(all_sigma, self.params.vpi_output_norms_amount, dim=-1)) # [norm_amount x batch_size x action_dim]
-        vpi_norms: dist.Normal = dist.Normal(loc=mu_stack, scale=sigma_stack)
 
         u_copies: Tensor = u.unsqueeze(0).expand(self.params.vpi_output_norms_amount, -1, -1) # [norm_amount x batch_size x action_dim]
-        vpi_probs: Tensor = (torch.exp(vpi_norms.log_prob(u_copies)) + delta) * derivative # [norm_amount x batch_size x action_dim]
+        print(mu_stack.size(), sigma_stack.size(), u_copies.size())
+        vpi_probs: Tensor = (self._normal_prob(u_copies, mu_stack, sigma_stack) + delta) * derivative # [norm_amount x batch_size x action_dim]
         vpi_probs = vpi_probs.prod(dim=-1, keepdim=True) # [norm_amount x batch_size x 1]
         vpi_probs = vpi_probs.sum(dim=0, keepdim=False) / self.params.vpi_output_norms_amount # [batch_size x 1]
         vpi_dist_log_prob = torch.log(vpi_probs + 1e-10)
 
         return action, policy_log_prob, vpi_dist_log_prob
         
-    def _get_vpi_dist_model_loss(self, state: Tensor, delta: float = 1e-4) -> Tensor:
+    def _get_vpi_dist_model_loss(self, state: Tensor, delta: float = 1e-5) -> Tensor:
         # Sample VPI actions
         all_mu: Tensor # [batch_size x action_dim * output_norms_amount]
         all_sigma: Tensor # [batch_size x action_dim * output_norms_amount]
@@ -128,11 +127,10 @@ class VPISAC(RLModel):
         action = torch.sigmoid(norm_action) * (self.action_range_max - self.action_range_min) + self.action_range_min
                 
         # Get vpi distribution log probs
-        norms: dist.Normal = dist.Normal(loc=mu_stack, scale=sigma_stack)
         u: Tensor = norm_action # [batch_size x action_dim]
         derivative: Tensor = (self.action_range_max - self.action_range_min) / ((action - self.action_range_min) * (self.action_range_max - action) + delta)
         u_copies: Tensor = u.unsqueeze(0).expand(self.params.vpi_output_norms_amount, -1, -1) # [norm_amount x batch_size x action_dim]
-        probs: Tensor = (torch.exp(norms.log_prob(u_copies)) + delta) * derivative # [norm_amount x batch_size x action_dim]
+        probs: Tensor = (self._normal_prob(u_copies, mu_stack, sigma_stack) + delta) * derivative # [norm_amount x batch_size x action_dim]
         probs = probs.prod(dim=-1, keepdim=True) # [norm_amount x batch_size x 1]
         probs = probs.sum(dim=0, keepdim=False) / self.params.vpi_output_norms_amount # [batch_size x 1]
 
@@ -155,7 +153,7 @@ class VPISAC(RLModel):
         q_sigma: Tensor =  torch.where(mu1 < mu2, sigma1, sigma2) # [batch_size x 1]
 
         z: Tensor = (optimal_action_value - q_mu) / (q_sigma + delta) # [batch_size x 1]
-        pdf: Tensor = torch.exp(self.normal.log_prob(z)) # [batch_size x 1]
+        pdf: Tensor = self._normal_prob(z, 0.0, 1.0) # [batch_size x 1]
         cdf: Tensor = self.normal.cdf(z) # [batch_size x 1]
         vpi: Tensor = q_sigma * pdf + (q_mu - optimal_action_value) * (1.0 - cdf) # [batch_size x 1]
         vpi_log: Tensor = torch.log(vpi + delta) # [batch_size x 1]
