@@ -192,7 +192,8 @@ class SACParams:
 class VPISACParams:
     def __init__(self, gamma: float = 0.99, q_value_lr: float = 1e-4, policy_lr: float = 1e-4, vpi_lr: float = 1e-4, batch_size: int = 100,
                  experience_replay_max_size: int = 1000000, polyak: float = 0.995, steps_per_update: int = 50, repeats_per_update: int = 50,
-                 experience_replay_state_to_uint8: bool = False, vpi_output_norms_amount: int = 1, vpi_const: float = 0.2, uniform_start_steps: int = 10000):
+                 experience_replay_state_to_uint8: bool = False, vpi_output_norms_amount: int = 1, vpi_const: float = 0.2, uniform_start_steps: int = 10000,
+                 weighted_normals: bool = True):
         self.gamma: float = gamma
         self.q_value_lr: float = q_value_lr
         self.policy_lr: float = policy_lr
@@ -206,6 +207,8 @@ class VPISACParams:
         self.vpi_output_norms_amount: int = vpi_output_norms_amount
         self.vpi_const: float = vpi_const
         self.uniform_start_steps: int = uniform_start_steps
+        self.weighted_normals: bool = weighted_normals
+
     
     def to_dict(self) -> Dict[str, Any]:
         params_dict: Dict = {
@@ -222,6 +225,7 @@ class VPISACParams:
             "experience_replay_state_to_uint8": self.experience_replay_state_to_uint8,
             "vpi_output_norms_amount": self.vpi_output_norms_amount,
             "vpi_const": self.vpi_const,
-            "uniform_start_steps": self.uniform_start_steps
+            "uniform_start_steps": self.uniform_start_steps,
+            "weighted_normals": self.weighted_normals
         }
         return params_dict
