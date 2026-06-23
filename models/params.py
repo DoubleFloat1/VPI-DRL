@@ -192,8 +192,8 @@ class SACParams:
 class VPISACParams:
     def __init__(self, gamma: float = 0.99, q_value_lr: float = 1e-4, policy_lr: float = 1e-4, vpi_lr: float = 1e-4, batch_size: int = 100,
                  experience_replay_max_size: int = 1000000, polyak: float = 0.995, steps_per_update: int = 50, repeats_per_update: int = 50,
-                 experience_replay_state_to_uint8: bool = False, vpi_output_norms_amount: int = 1, vpi_const: float = 0.2, uniform_start_steps: int = 10000,
-                 weighted_normals: bool = True):
+                 experience_replay_state_to_uint8: bool = False, vpi_output_norms_amount: int = 1, initial_vpi_const: float = 0.2, min_vpi_const: float = 0.05,
+                 total_steps_of_vpi_const_decay: int = 3000000, uniform_start_steps: int = 10000, weighted_normals: bool = True):
         self.gamma: float = gamma
         self.q_value_lr: float = q_value_lr
         self.policy_lr: float = policy_lr
@@ -205,7 +205,9 @@ class VPISACParams:
         self.repeats_per_update: int = repeats_per_update
         self.experience_replay_state_to_uint8: bool = experience_replay_state_to_uint8
         self.vpi_output_norms_amount: int = vpi_output_norms_amount
-        self.vpi_const: float = vpi_const
+        self.initial_vpi_const: float = initial_vpi_const
+        self.min_vpi_const: float = min_vpi_const
+        self.total_steps_of_vpi_const_decay: int = total_steps_of_vpi_const_decay
         self.uniform_start_steps: int = uniform_start_steps
         self.weighted_normals: bool = weighted_normals
 
@@ -224,7 +226,9 @@ class VPISACParams:
             "repeats_per_update": self.repeats_per_update,
             "experience_replay_state_to_uint8": self.experience_replay_state_to_uint8,
             "vpi_output_norms_amount": self.vpi_output_norms_amount,
-            "vpi_const": self.vpi_const,
+            "initial_vpi_const": self.initial_vpi_const,
+            "min_vpi_const": self.min_vpi_const,
+            "total_steps_of_vpi_const_decay": self.total_steps_of_vpi_const_decay,
             "uniform_start_steps": self.uniform_start_steps,
             "weighted_normals": self.weighted_normals
         }

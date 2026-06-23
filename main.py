@@ -204,6 +204,7 @@ def main_sac(gym_env: MujocoEnv, data_file: str, train_step_amount: int, trainin
     begin_training(gym_env, sac, data_file, train_step_amount, training_epochs, test_episode_amount, trials_amount, training_envs_amount=1)
 
 def main_vpisac(gym_env: MujocoEnv, data_file: str, train_step_amount: int, training_epochs: int, test_episode_amount: int, trials_amount: int):
+    total_steps_of_vpi_const_decay: int = train_step_amount * training_epochs
     params: VPISACParams = VPISACParams(
         gamma=0.99,
         q_value_lr=1e-4,
@@ -215,7 +216,9 @@ def main_vpisac(gym_env: MujocoEnv, data_file: str, train_step_amount: int, trai
         steps_per_update=50,
         repeats_per_update=50,
         vpi_output_norms_amount=16,
-        vpi_const=0.2,
+        initial_vpi_const=0.2,
+        min_vpi_const=0.2,
+        total_steps_of_vpi_const_decay=total_steps_of_vpi_const_decay,
         uniform_start_steps=10000,
         weighted_normals=True
     )
@@ -226,10 +229,13 @@ def main_vpisac(gym_env: MujocoEnv, data_file: str, train_step_amount: int, trai
 if __name__ == "__main__":
     #gym_env = MujucoHalfCheetah(discretization_factor=None)
     #gym_env = MujucoAnt(discretization_factor=None, ctrl_cost_weight=0.5, healthy_reward=1.0, contact_cost_weight=5e-4)
-    gym_env = MujucoWalker2D(discretization_factor=None, healthy_reward=1.0, ctrl_cost_weight=1e-3, terminate_when_unhealthy=True)
+    #gym_env = MujucoWalker2D(discretization_factor=None, healthy_reward=1.0, ctrl_cost_weight=1e-3, terminate_when_unhealthy=True)
+    gym_env = MujucoHopper(discretization_factor=None, healthy_reward=1.0, ctrl_cost_weight=1e-3, terminate_when_unhealthy=True)
+    #gym_env = MujucoSwimmer(discretization_factor=None, ctrl_cost_weight=1e-4)
+    #gym_env = MujucoHumanoid(discretization_factor=None)
 
     train_step_amount: int = 10000
-    training_epochs: int = 200
+    training_epochs: int = 300
     test_episode_amount: int = 10
     trials_amount: int = 1
 

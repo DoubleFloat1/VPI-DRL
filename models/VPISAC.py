@@ -47,6 +47,7 @@ class VPISAC(RLModel):
         self.step_count: int = 0
         self.multi_normal: MultivariateNormal = MultivariateNormal(loc=torch.zeros(self.actions_amount), covariance_matrix=torch.eye(self.actions_amount))
         self.normal: dist.Normal = dist.Normal(loc=0.0, scale=1.0)
+        self.vpi_const: float = params.initial_vpi_const
     
     def get_next_action(self, state: Tensor) -> ndarray:
         if self.step_count < self.params.uniform_start_steps:
@@ -171,6 +172,9 @@ class VPISAC(RLModel):
     def improve(self, state: Tensor, action: int | Tensor, reward: float, next_state: Tensor, terminated: bool, truncated: bool, env_id: int = 0) -> None:
         self.experience_replay.add_experience(state, action, reward, next_state, terminated)
         self.step_count += 1
+        if self.vpi_const > self.params.min_vpi_const:
+            prop: float = self.step_count / self.params.total_steps_of_vpi_const_decay
+            self.vpi_const = prop * self.params.min_vpi_const + (1.0 - prop) * self.params.initial_vpi_const
         if self.experience_replay.can_get_batch() and (self.step_count % self.params.steps_per_update == 0):
             self.update_models()
     
@@ -194,8 +198,8 @@ class VPISAC(RLModel):
                 pred_next_q_value1: Tensor = self._sample_q_value(self.target_q_value_model1, next_state_tensor, pred_next_actions)
                 pred_next_q_value2: Tensor = self._sample_q_value(self.target_q_value_model2, next_state_tensor, pred_next_actions)
                 temp: Tensor = torch.min(pred_next_q_value1, pred_next_q_value2)
-                temp = temp - self.params.vpi_const * pred_next_actions_log_probs
-                temp = temp + self.params.vpi_const * vpi_dist_log_prob
+                temp = temp - self.vpi_const * pred_next_actions_log_probs
+                temp = temp + self.vpi_const * vpi_dist_log_prob
                 td_target: Tensor = reward_tensor + self.params.gamma * (1 - episode_terminated_tensor) * temp
             
             # Update Q1 model parameters
@@ -219,8 +223,8 @@ class VPISAC(RLModel):
             q_val1: Tensor = self._sample_q_value(self.q_value_model1, state_tensor, predicted_actions)
             q_val2: Tensor = self._sample_q_value(self.q_value_model2, state_tensor, predicted_actions)
             policy_loss: Tensor = -torch.min(q_val1, q_val2)
-            policy_loss = policy_loss + self.params.vpi_const * predicted_actions_log_probs
-            policy_loss = policy_loss - self.params.vpi_const * predicted_actions_vpi_dist_log_prob
+            policy_loss = policy_loss + self.vpi_const * predicted_actions_log_probs
+            policy_loss = policy_loss - self.vpi_const * predicted_actions_vpi_dist_log_prob
             policy_loss = policy_loss.mean()
             self.policy_optim.zero_grad()
             policy_loss.backward()

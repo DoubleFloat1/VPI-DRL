@@ -282,6 +282,16 @@ class MujucoAnt(MujocoEnv):
 class MujucoHalfCheetah(MujocoEnv):
     def __init__(self, discretization_factor: int = 4, action_range_min: float = -1.0, action_range_max: float = 1.0):
         super().__init__("HalfCheetah-v5", [17], 6, action_range_min, action_range_max, discretization_factor)
+    
+    def get_params_dict(self) -> Dict[str, Any]:
+        return {"gym_id": self.gym_name,
+                "state_size": self.state_size,
+                "action_dimension": self.action_dimension,
+                "action_range_min": self.action_range_min,
+                "action_range_max": self.action_range_max,
+                "discretization_factor": self.discretization_factor,
+                "actions_amount": self.actions_amount
+                }
 
 class MujucoHopper(MujocoEnv):
     def __init__(self, discretization_factor: int = 17, ctrl_cost_weight: float = 1e-3, healthy_reward: float = 1e-3, terminate_when_unhealthy: bool = True,
@@ -310,8 +320,24 @@ class MujucoHopper(MujocoEnv):
                 }
 
 class MujucoSwimmer(MujocoEnv):
-    def __init__(self, discretization_factor: int = 63, action_range_min: float = -1.0, action_range_max: float = 1.0):
+    def __init__(self, discretization_factor: int = 63, ctrl_cost_weight: float = 1e-4, action_range_min: float = -1.0, action_range_max: float = 1.0):
+        self.ctrl_cost_weight: float = ctrl_cost_weight
         super().__init__("Swimmer-v5", [8], 2, action_range_min, action_range_max, discretization_factor)
+    
+    def create_mujoco_env(self) -> gym.Env:
+        env = gym.make(self.gym_name, render_mode=None, ctrl_cost_weight=self.ctrl_cost_weight)
+        return env
+
+    def get_params_dict(self) -> Dict[str, Any]:
+        return {"gym_id": self.gym_name,
+                "state_size": self.state_size,
+                "action_dimension": self.action_dimension,
+                "action_range_min": self.action_range_min,
+                "action_range_max": self.action_range_max,
+                "discretization_factor": self.discretization_factor,
+                "actions_amount": self.actions_amount,
+                "ctrl_cost_weight": self.ctrl_cost_weight
+                }
 
 class MujucoWalker2D(MujocoEnv):
     def __init__(self, discretization_factor: int = 4, ctrl_cost_weight: float = 1e-3, healthy_reward: float = 0.0, terminate_when_unhealthy: bool = False,
@@ -336,5 +362,36 @@ class MujucoWalker2D(MujocoEnv):
                 "actions_amount": self.actions_amount,
                 "ctrl_cost_weight": self.ctrl_cost_weight,
                 "healthy_reward": self.healthy_reward,
+                "terminate_when_unhealthy": self.terminate_when_unhealthy
+                }
+
+class MujucoHumanoid(MujocoEnv):
+    def __init__(self, discretization_factor: int = None, ctrl_cost_weight: float = 0.1, healthy_reward: float = 5.0, contact_cost_weight: float = 5e-7,
+                 forward_reward_weight: float = 1.25, terminate_when_unhealthy: bool = True, action_range_min: float = -0.4, action_range_max: float = 0.4):
+        self.ctrl_cost_weight: float = ctrl_cost_weight
+        self.healthy_reward: float = healthy_reward
+        self.contact_cost_weight: float = contact_cost_weight
+        self.forward_reward_weight: float = forward_reward_weight
+        self.terminate_when_unhealthy: bool = terminate_when_unhealthy
+        super().__init__("Humanoid-v5", [348], 17, action_range_min, action_range_max, discretization_factor)
+
+    def create_mujoco_env(self) -> gym.Env:
+        env = gym.make(self.gym_name, render_mode=None, ctrl_cost_weight=self.ctrl_cost_weight, healthy_reward=self.healthy_reward,
+                       contact_cost_weight=self.contact_cost_weight, forward_reward_weight=self.forward_reward_weight, 
+                       terminate_when_unhealthy=self.terminate_when_unhealthy)
+        return env
+    
+    def get_params_dict(self) -> Dict[str, Any]:
+        return {"gym_id": self.gym_name,
+                "state_size": self.state_size,
+                "action_dimension": self.action_dimension,
+                "action_range_min": self.action_range_min,
+                "action_range_max": self.action_range_max,
+                "discretization_factor": self.discretization_factor,
+                "actions_amount": self.actions_amount,
+                "ctrl_cost_weight": self.ctrl_cost_weight,
+                "healthy_reward": self.healthy_reward,
+                "contact_cost_weight": self.contact_cost_weight,
+                "forward_reward_weight": self.forward_reward_weight,
                 "terminate_when_unhealthy": self.terminate_when_unhealthy
                 }
