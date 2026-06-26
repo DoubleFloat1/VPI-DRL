@@ -375,6 +375,11 @@ class MujucoHumanoid(MujocoEnv):
         self.terminate_when_unhealthy: bool = terminate_when_unhealthy
         super().__init__("Humanoid-v5", [348], 17, action_range_min, action_range_max, discretization_factor)
 
+    def preprocess(self, x: ndarray) -> Tensor:
+        state_tensor: Tensor = torch.tensor(x, dtype=torch.float32)
+        state_tensor[-78:] /= 1000.0
+        return state_tensor
+
     def create_mujoco_env(self) -> gym.Env:
         env = gym.make(self.gym_name, render_mode=None, ctrl_cost_weight=self.ctrl_cost_weight, healthy_reward=self.healthy_reward,
                        contact_cost_weight=self.contact_cost_weight, forward_reward_weight=self.forward_reward_weight, 
